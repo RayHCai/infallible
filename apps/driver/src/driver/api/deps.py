@@ -4,6 +4,7 @@ from fastapi import Depends, Request
 
 from driver.db.database import Database
 from driver.pipeline.run_manager import RunManager
+from driver.services.firmware_host import FirmwareHostClient
 from driver.settings import DriverSettings
 
 if TYPE_CHECKING:
@@ -26,6 +27,11 @@ def get_settings(request: Request) -> DriverSettings:
     return _services(request).settings
 
 
+def get_firmware(request: Request) -> FirmwareHostClient:
+    return _services(request).firmware
+
+
 Runs = Annotated[RunManager, Depends(get_runs)]
 Db = Annotated[Database, Depends(get_db)]
 Settings = Annotated[DriverSettings, Depends(get_settings)]
+Firmware = Annotated[FirmwareHostClient, Depends(get_firmware)]

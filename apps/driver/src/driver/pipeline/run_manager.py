@@ -153,7 +153,7 @@ class RunManager:
 
     async def connect(self, device_id: UUID | None) -> ConnectResponse:
         active = self._require(None, {RunState.CONNECT})
-        if device_id is not None:
+        if device_id not in {None, self.firmware.device_id}:
             log.warning(
                 'physical pump %s requested; adapters not implemented, using emulators', device_id
             )

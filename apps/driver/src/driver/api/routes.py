@@ -7,7 +7,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from serial.tools import list_ports
 
-from driver.api.deps import Db, Runs, Settings
+from driver.api.deps import Db, Firmware, Runs, Settings
 from driver.object_builder import Capture
 from infallible_contracts import (
     Agent,
@@ -93,12 +93,14 @@ async def connect(body: ConnectRequest, runs: Runs) -> ConnectResponse:
 
 
 @router.get('/devices')
-async def devices() -> list[Device]:
+async def devices(firmware: Firmware) -> list[Device]:
     # Stable id across polls/replugs: derived from the port's hardware id.
-    return [
+    serial = [
         Device(id=uuid5(NAMESPACE_URL, p.hwid), name=p.description or p.device, port=p.device)
         for p in list_ports.comports()
     ]
+    host = await firmware.device()
+    return [host, *serial] if host else serial
 
 
 # --------------------------------------------------------------------------- #
