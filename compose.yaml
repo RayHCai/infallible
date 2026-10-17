@@ -1,0 +1,86 @@
+# Local stack: redis + firmware host + driver (which spawns agent-persona
+# processes inside its own container). The visualizer (Tauri desktop app) and
+# the scanner (Expo phone app) run outside Docker and talk to the driver.
+#
+#   cp .env.example .env     # set ANTHROPIC_API_KEY and DRIVER_PUBLIC_URL
+#   docker compose up --build
+#   docker compose watch     # rebuild on source changes
+
+name: infallible
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+  tmpfs: ['/tmp']
+  restart: unless-stopped
+  init: true
+
+services:
+  redis:
+    <<: *hardening
+    image: redis:8-alpine
+    # Ephemeral control plane: streams are rebuilt per run, so no persistence.
+    command: ['redis-server', '--save', '', '--appendonly', 'no', '--maxmemory', '256mb']
+    tmpfs: ['/data', '/tmp']
+    ports: ['127.0.0.1:6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  firmware:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: apps/firmware/Dockerfile
+    image: infallible/firmware:dev
+    environment:
+      FIRMWARE_ADVERTISE_HOST: firmware
+      FIRMWARE_MAX_INSTANCES: ${FIRMWARE_MAX_INSTANCES:-16}
+      FIRMWARE_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ['127.0.0.1:8100:8100']
+    develop:
+      watch:
+        - { action: rebuild, path: apps/firmware/src }
+        - { action: rebuild, path: packages/contracts/src }
+
+  driver:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: apps/driver/Dockerfile
+    image: infallible/driver:dev
+    # Match your host uid/gid on Linux so ./data stays writable (`id -u`/`id -g`).
+    user: '${DOCKER_UID:-10001}:${DOCKER_GID:-10001}'
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DRIVER_PUBLIC_URL: ${DRIVER_PUBLIC_URL:-http://localhost:8000}
+      DRIVER_REDIS_URL: redis://redis:6379/0
+      DRIVER_FIRMWARE_MODE: hosted
+      DRIVER_FIRMWARE_HOST_URL: http://firmware:8100
+      DRIVER_AGENT_COUNT: ${DRIVER_AGENT_COUNT:-5}
+      DRIVER_AGENT_BIND_HOST: 0.0.0.0
+      DRIVER_AGENT_ADVERTISE_HOST: ${DRIVER_AGENT_ADVERTISE_HOST:-localhost}
+      DRIVER_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      AGENT_PLANNER_MODEL: ${AGENT_PLANNER_MODEL:-claude-sonnet-5-5}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      AGENT_PERCEPTION_JEV: ${AGENT_PERCEPTION_JEV:-true}
+    ports:
+      - '8000:8000' # LAN-reachable: the phone uploads captures here
+      - '127.0.0.1:8300-8315:8300-8315' # per-agent frame WebSockets (visualizer)
+    volumes:
+      - ./data:/data
+      - driver-state:/state
+    depends_on:
+      redis: { condition: service_healthy }
+      firmware: { condition: service_healthy }
+    develop:
+      watch:
+        - { action: rebuild, path: apps/driver/src }
+        - { action: rebuild, path: apps/agent-persona/src }
+        - { action: rebuild, path: packages/contracts/src }
+
+volumes:
+  driver-state:

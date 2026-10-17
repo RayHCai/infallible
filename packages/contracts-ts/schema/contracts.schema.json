@@ -1,0 +1,1474 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InfallibleContracts",
+  "type": "object",
+  "properties": {
+    "Action": {
+      "$ref": "#/$defs/Action"
+    },
+    "Agent": {
+      "$ref": "#/$defs/Agent"
+    },
+    "AgentEvent": {
+      "$ref": "#/$defs/AgentEvent"
+    },
+    "BuildAccepted": {
+      "$ref": "#/$defs/BuildAccepted"
+    },
+    "ConnectRequest": {
+      "$ref": "#/$defs/ConnectRequest"
+    },
+    "ConnectResponse": {
+      "$ref": "#/$defs/ConnectResponse"
+    },
+    "Device": {
+      "$ref": "#/$defs/Device"
+    },
+    "DriverMessage": {
+      "$ref": "#/$defs/DriverMessage"
+    },
+    "MeshAnnotations": {
+      "$ref": "#/$defs/MeshAnnotations"
+    },
+    "Persona": {
+      "$ref": "#/$defs/Persona"
+    },
+    "QrPayload": {
+      "$ref": "#/$defs/QrPayload"
+    },
+    "Run": {
+      "$ref": "#/$defs/Run"
+    },
+    "StartResponse": {
+      "$ref": "#/$defs/StartResponse"
+    },
+    "StopRequest": {
+      "$ref": "#/$defs/StopRequest"
+    },
+    "SuggestionsFile": {
+      "$ref": "#/$defs/SuggestionsFile"
+    },
+    "Task": {
+      "$ref": "#/$defs/Task"
+    }
+  },
+  "required": [
+    "Action",
+    "Agent",
+    "AgentEvent",
+    "BuildAccepted",
+    "ConnectRequest",
+    "ConnectResponse",
+    "Device",
+    "DriverMessage",
+    "MeshAnnotations",
+    "Persona",
+    "QrPayload",
+    "Run",
+    "StartResponse",
+    "StopRequest",
+    "SuggestionsFile",
+    "Task"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Action": {
+      "title": "Action",
+      "discriminator": {
+        "mapping": {
+          "done": "#/$defs/DoneAction",
+          "hold": "#/$defs/HoldAction",
+          "press": "#/$defs/PressAction",
+          "read_screen": "#/$defs/ReadScreenAction",
+          "rotate_view": "#/$defs/RotateViewAction",
+          "turn": "#/$defs/TurnAction",
+          "wait": "#/$defs/WaitAction",
+          "zoom": "#/$defs/ZoomAction"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PressAction"
+        },
+        {
+          "$ref": "#/$defs/HoldAction"
+        },
+        {
+          "$ref": "#/$defs/TurnAction"
+        },
+        {
+          "$ref": "#/$defs/RotateViewAction"
+        },
+        {
+          "$ref": "#/$defs/ZoomAction"
+        },
+        {
+          "$ref": "#/$defs/WaitAction"
+        },
+        {
+          "$ref": "#/$defs/ReadScreenAction"
+        },
+        {
+          "$ref": "#/$defs/DoneAction"
+        }
+      ]
+    },
+    "ActionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "type": {
+          "const": "action",
+          "default": "action",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "step": {
+          "title": "Step",
+          "type": "integer"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "chosen": {
+          "discriminator": {
+            "mapping": {
+              "done": "#/$defs/DoneAction",
+              "hold": "#/$defs/HoldAction",
+              "press": "#/$defs/PressAction",
+              "read_screen": "#/$defs/ReadScreenAction",
+              "rotate_view": "#/$defs/RotateViewAction",
+              "turn": "#/$defs/TurnAction",
+              "wait": "#/$defs/WaitAction",
+              "zoom": "#/$defs/ZoomAction"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PressAction"
+            },
+            {
+              "$ref": "#/$defs/HoldAction"
+            },
+            {
+              "$ref": "#/$defs/TurnAction"
+            },
+            {
+              "$ref": "#/$defs/RotateViewAction"
+            },
+            {
+              "$ref": "#/$defs/ZoomAction"
+            },
+            {
+              "$ref": "#/$defs/WaitAction"
+            },
+            {
+              "$ref": "#/$defs/ReadScreenAction"
+            },
+            {
+              "$ref": "#/$defs/DoneAction"
+            }
+          ],
+          "title": "Chosen"
+        },
+        "reasoning": {
+          "default": "",
+          "title": "Reasoning",
+          "type": "string"
+        },
+        "state_after": {
+          "additionalProperties": true,
+          "title": "State After",
+          "type": "object"
+        },
+        "trace_path": {
+          "title": "Trace Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "agent_id",
+        "at",
+        "type",
+        "task_id",
+        "step",
+        "options",
+        "chosen",
+        "reasoning",
+        "state_after",
+        "trace_path"
+      ],
+      "title": "ActionEvent",
+      "type": "object"
+    },
+    "Agent": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "persona_id": {
+          "format": "uuid",
+          "title": "Persona Id",
+          "type": "string"
+        },
+        "firmware_endpoint": {
+          "description": "host:port, or 'local' for a private emulator.",
+          "title": "Firmware Endpoint",
+          "type": "string"
+        },
+        "frame_endpoint": {
+          "description": "host:port of the agent's frame WebSocket.",
+          "title": "Frame Endpoint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "persona_id",
+        "firmware_endpoint",
+        "frame_endpoint"
+      ],
+      "title": "Agent",
+      "type": "object"
+    },
+    "AgentError": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "type": {
+          "const": "agent_error",
+          "default": "agent_error",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "agent_id",
+        "at",
+        "type",
+        "task_id",
+        "message"
+      ],
+      "title": "AgentError",
+      "type": "object"
+    },
+    "AgentEvent": {
+      "title": "AgentEvent",
+      "discriminator": {
+        "mapping": {
+          "action": "#/$defs/ActionEvent",
+          "agent_error": "#/$defs/AgentError",
+          "agent_ready": "#/$defs/AgentReady",
+          "task_done": "#/$defs/TaskDone",
+          "task_started": "#/$defs/TaskStarted"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AgentReady"
+        },
+        {
+          "$ref": "#/$defs/TaskStarted"
+        },
+        {
+          "$ref": "#/$defs/ActionEvent"
+        },
+        {
+          "$ref": "#/$defs/TaskDone"
+        },
+        {
+          "$ref": "#/$defs/AgentError"
+        }
+      ]
+    },
+    "AgentEventMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "agent_event",
+          "default": "agent_event",
+          "title": "Type",
+          "type": "string"
+        },
+        "event": {
+          "discriminator": {
+            "mapping": {
+              "action": "#/$defs/ActionEvent",
+              "agent_error": "#/$defs/AgentError",
+              "agent_ready": "#/$defs/AgentReady",
+              "task_done": "#/$defs/TaskDone",
+              "task_started": "#/$defs/TaskStarted"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AgentReady"
+            },
+            {
+              "$ref": "#/$defs/TaskStarted"
+            },
+            {
+              "$ref": "#/$defs/ActionEvent"
+            },
+            {
+              "$ref": "#/$defs/TaskDone"
+            },
+            {
+              "$ref": "#/$defs/AgentError"
+            }
+          ],
+          "title": "Event"
+        }
+      },
+      "required": [
+        "type",
+        "event"
+      ],
+      "title": "AgentEventMessage",
+      "type": "object"
+    },
+    "AgentReady": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "type": {
+          "const": "agent_ready",
+          "default": "agent_ready",
+          "title": "Type",
+          "type": "string"
+        },
+        "frame_endpoint": {
+          "title": "Frame Endpoint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "agent_id",
+        "at",
+        "type",
+        "frame_endpoint"
+      ],
+      "title": "AgentReady",
+      "type": "object"
+    },
+    "BoxRegion": {
+      "additionalProperties": false,
+      "description": "Normalised (0..1) box in a reference render + its 3D anchor on the mesh.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "x": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Y",
+          "type": "number"
+        },
+        "w": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "W",
+          "type": "number"
+        },
+        "h": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "H",
+          "type": "number"
+        },
+        "anchor": {
+          "description": "x, y, z on the mesh, metres.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Anchor",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "x",
+        "y",
+        "w",
+        "h",
+        "anchor"
+      ],
+      "title": "BoxRegion",
+      "type": "object"
+    },
+    "BuildAccepted": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "frames_received": {
+          "title": "Frames Received",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "frames_received"
+      ],
+      "title": "BuildAccepted",
+      "type": "object"
+    },
+    "BuildDoneMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "build_done",
+          "default": "build_done",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/BuildSource"
+        },
+        "mesh_url": {
+          "title": "Mesh Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "source",
+        "mesh_url"
+      ],
+      "title": "BuildDoneMessage",
+      "type": "object"
+    },
+    "BuildProgressMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "build_progress",
+          "default": "build_progress",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "progress": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Progress",
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "stage",
+        "progress"
+      ],
+      "title": "BuildProgressMessage",
+      "type": "object"
+    },
+    "BuildSource": {
+      "enum": [
+        "scan",
+        "fallback"
+      ],
+      "title": "BuildSource",
+      "type": "string"
+    },
+    "ChangeType": {
+      "description": "Small, closed set so the visualizer can animate every proposal.",
+      "enum": [
+        "move_button",
+        "resize_button",
+        "relabel",
+        "resize_text",
+        "confirm_dialog",
+        "change_timeout",
+        "add_audio_cue"
+      ],
+      "title": "ChangeType",
+      "type": "string"
+    },
+    "ConnectRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Physical pump id; null means emulators only.",
+          "title": "Device Id"
+        }
+      },
+      "required": [
+        "device_id"
+      ],
+      "title": "ConnectRequest",
+      "type": "object"
+    },
+    "ConnectResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "firmware_endpoints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Firmware Endpoints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_id",
+        "firmware_endpoints"
+      ],
+      "title": "ConnectResponse",
+      "type": "object"
+    },
+    "Device": {
+      "additionalProperties": false,
+      "description": "A pump attached to the driver's machine.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "port"
+      ],
+      "title": "Device",
+      "type": "object"
+    },
+    "DoneAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "done",
+          "default": "done",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DoneAction",
+      "type": "object"
+    },
+    "DriverMessage": {
+      "title": "DriverMessage",
+      "discriminator": {
+        "mapping": {
+          "agent_event": "#/$defs/AgentEventMessage",
+          "build_done": "#/$defs/BuildDoneMessage",
+          "build_progress": "#/$defs/BuildProgressMessage",
+          "run_state": "#/$defs/RunStateMessage",
+          "suggestions_ready": "#/$defs/SuggestionsReadyMessage",
+          "task_scored": "#/$defs/TaskScoredMessage"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/RunStateMessage"
+        },
+        {
+          "$ref": "#/$defs/BuildProgressMessage"
+        },
+        {
+          "$ref": "#/$defs/BuildDoneMessage"
+        },
+        {
+          "$ref": "#/$defs/AgentEventMessage"
+        },
+        {
+          "$ref": "#/$defs/TaskScoredMessage"
+        },
+        {
+          "$ref": "#/$defs/SuggestionsReadyMessage"
+        }
+      ]
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "step": {
+          "title": "Step",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agent_id",
+        "task_id",
+        "step"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "HoldAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "hold",
+          "default": "hold",
+          "title": "Kind",
+          "type": "string"
+        },
+        "button_id": {
+          "title": "Button Id",
+          "type": "string"
+        },
+        "ms": {
+          "maximum": 60000,
+          "minimum": 1,
+          "title": "Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "button_id",
+        "ms"
+      ],
+      "title": "HoldAction",
+      "type": "object"
+    },
+    "MeshAnnotations": {
+      "additionalProperties": false,
+      "description": "Sidecar for every pump mesh (``pump.annotations.json``).",
+      "properties": {
+        "screen": {
+          "$ref": "#/$defs/BoxRegion"
+        },
+        "buttons": {
+          "items": {
+            "$ref": "#/$defs/BoxRegion"
+          },
+          "title": "Buttons",
+          "type": "array"
+        },
+        "scale_m": {
+          "default": 1.0,
+          "description": "Metres per mesh unit.",
+          "exclusiveMinimum": 0,
+          "title": "Scale M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "screen",
+        "buttons",
+        "scale_m"
+      ],
+      "title": "MeshAnnotations",
+      "type": "object"
+    },
+    "Modifier": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ModifierId"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "parameters"
+      ],
+      "title": "Modifier",
+      "type": "object"
+    },
+    "ModifierId": {
+      "description": "Perception / motor degradations applied locally by agent-persona.",
+      "enum": [
+        "blur",
+        "contrast_loss",
+        "color_deficiency",
+        "tremor",
+        "hearing_loss",
+        "neuropathy"
+      ],
+      "title": "ModifierId",
+      "type": "string"
+    },
+    "Persona": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/$defs/PersonaAttributes"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "attributes"
+      ],
+      "title": "Persona",
+      "type": "object"
+    },
+    "PersonaAttributes": {
+      "additionalProperties": false,
+      "properties": {
+        "age": {
+          "maximum": 120,
+          "minimum": 0,
+          "title": "Age",
+          "type": "integer"
+        },
+        "gender": {
+          "title": "Gender",
+          "type": "string"
+        },
+        "guiding_prompt": {
+          "title": "Guiding Prompt",
+          "type": "string"
+        },
+        "modifiers": {
+          "items": {
+            "$ref": "#/$defs/Modifier"
+          },
+          "title": "Modifiers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "age",
+        "gender",
+        "guiding_prompt",
+        "modifiers"
+      ],
+      "title": "PersonaAttributes",
+      "type": "object"
+    },
+    "PressAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "press",
+          "default": "press",
+          "title": "Kind",
+          "type": "string"
+        },
+        "button_id": {
+          "title": "Button Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "button_id"
+      ],
+      "title": "PressAction",
+      "type": "object"
+    },
+    "ProposedChange": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ChangeType"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "params"
+      ],
+      "title": "ProposedChange",
+      "type": "object"
+    },
+    "QrPayload": {
+      "additionalProperties": false,
+      "description": "What the visualizer's QR code encodes and the scanner decodes.",
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "driver_url": {
+          "title": "Driver Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "driver_url"
+      ],
+      "title": "QrPayload",
+      "type": "object"
+    },
+    "ReadScreenAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "read_screen",
+          "default": "read_screen",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ReadScreenAction",
+      "type": "object"
+    },
+    "RotateViewAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rotate_view",
+          "default": "rotate_view",
+          "title": "Kind",
+          "type": "string"
+        },
+        "axis": {
+          "enum": [
+            "x",
+            "y",
+            "z"
+          ],
+          "title": "Axis",
+          "type": "string"
+        },
+        "deg": {
+          "title": "Deg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "axis",
+        "deg"
+      ],
+      "title": "RotateViewAction",
+      "type": "object"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RunState"
+        },
+        "current_task_index": {
+          "default": 0,
+          "title": "Current Task Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "state",
+        "current_task_index"
+      ],
+      "title": "Run",
+      "type": "object"
+    },
+    "RunState": {
+      "enum": [
+        "prep",
+        "build",
+        "connect",
+        "running",
+        "evaluating",
+        "completed",
+        "stopped",
+        "failed"
+      ],
+      "title": "RunState",
+      "type": "string"
+    },
+    "RunStateMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "run_state",
+          "default": "run_state",
+          "title": "Type",
+          "type": "string"
+        },
+        "run": {
+          "$ref": "#/$defs/Run"
+        }
+      },
+      "required": [
+        "type",
+        "run"
+      ],
+      "title": "RunStateMessage",
+      "type": "object"
+    },
+    "StartResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/RunState"
+        },
+        "qr": {
+          "$ref": "#/$defs/QrPayload"
+        },
+        "qr_png_b64": {
+          "title": "Qr Png B64",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "state",
+        "qr",
+        "qr_png_b64"
+      ],
+      "title": "StartResponse",
+      "type": "object"
+    },
+    "StopRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "StopRequest",
+      "type": "object"
+    },
+    "Suggestion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/SuggestionCategory"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "proposed_change": {
+          "$ref": "#/$defs/ProposedChange"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "title",
+        "rationale",
+        "evidence",
+        "proposed_change"
+      ],
+      "title": "Suggestion",
+      "type": "object"
+    },
+    "SuggestionCategory": {
+      "enum": [
+        "hardware",
+        "firmware",
+        "interaction"
+      ],
+      "title": "SuggestionCategory",
+      "type": "string"
+    },
+    "SuggestionsFile": {
+      "additionalProperties": false,
+      "description": "Shape of ``data/runs/{run_id}/suggestions.json``.",
+      "properties": {
+        "suggestions": {
+          "items": {
+            "$ref": "#/$defs/Suggestion"
+          },
+          "title": "Suggestions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "suggestions"
+      ],
+      "title": "SuggestionsFile",
+      "type": "object"
+    },
+    "SuggestionsReadyMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "suggestions_ready",
+          "default": "suggestions_ready",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "count": {
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "count"
+      ],
+      "title": "SuggestionsReadyMessage",
+      "type": "object"
+    },
+    "Task": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "description": "What the user is trying to do, in their words.",
+          "title": "Description",
+          "type": "string"
+        },
+        "goal": {
+          "description": "Instruction given to the agent.",
+          "title": "Goal",
+          "type": "string"
+        },
+        "initial_state": {
+          "additionalProperties": true,
+          "description": "Firmware reset state for this task.",
+          "title": "Initial State",
+          "type": "object"
+        },
+        "success": {
+          "description": "Predicate over the final firmware state, e.g. 'bolus_units == 2.5'.",
+          "title": "Success",
+          "type": "string"
+        },
+        "max_steps": {
+          "default": 25,
+          "maximum": 500,
+          "minimum": 1,
+          "title": "Max Steps",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "goal",
+        "initial_state",
+        "success",
+        "max_steps"
+      ],
+      "title": "Task",
+      "type": "object"
+    },
+    "TaskDone": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "type": {
+          "const": "task_done",
+          "default": "task_done",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "steps": {
+          "title": "Steps",
+          "type": "integer"
+        },
+        "declared_done": {
+          "description": "False when max_steps was hit.",
+          "title": "Declared Done",
+          "type": "boolean"
+        },
+        "final_state": {
+          "additionalProperties": true,
+          "title": "Final State",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "agent_id",
+        "at",
+        "type",
+        "task_id",
+        "steps",
+        "declared_done",
+        "final_state"
+      ],
+      "title": "TaskDone",
+      "type": "object"
+    },
+    "TaskOutcome": {
+      "enum": [
+        "passed",
+        "failed",
+        "errored"
+      ],
+      "title": "TaskOutcome",
+      "type": "string"
+    },
+    "TaskScoredMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "task_scored",
+          "default": "task_scored",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/TaskOutcome"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "agent_id",
+        "task_id",
+        "outcome"
+      ],
+      "title": "TaskScoredMessage",
+      "type": "object"
+    },
+    "TaskStarted": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "type": {
+          "const": "task_started",
+          "default": "task_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "agent_id",
+        "at",
+        "type",
+        "task_id"
+      ],
+      "title": "TaskStarted",
+      "type": "object"
+    },
+    "TurnAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "turn",
+          "default": "turn",
+          "title": "Kind",
+          "type": "string"
+        },
+        "dial": {
+          "title": "Dial",
+          "type": "string"
+        },
+        "steps": {
+          "title": "Steps",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "dial",
+        "steps"
+      ],
+      "title": "TurnAction",
+      "type": "object"
+    },
+    "WaitAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "wait",
+          "default": "wait",
+          "title": "Kind",
+          "type": "string"
+        },
+        "ms": {
+          "maximum": 60000,
+          "minimum": 0,
+          "title": "Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "ms"
+      ],
+      "title": "WaitAction",
+      "type": "object"
+    },
+    "ZoomAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "zoom",
+          "default": "zoom",
+          "title": "Kind",
+          "type": "string"
+        },
+        "delta": {
+          "title": "Delta",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "delta"
+      ],
+      "title": "ZoomAction",
+      "type": "object"
+    }
+  }
+}

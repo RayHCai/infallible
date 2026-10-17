@@ -1,0 +1,133 @@
+name: Release
+
+# main  -> publish container images (ghcr.io, tagged by branch + sha)
+# v*    -> images tagged by semver + desktop installers (draft GitHub release) + EAS mobile builds
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [driver, firmware]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/${{ matrix.service }}/Dockerfile
+          # arm64: the firmware host runs on a Raspberry Pi.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=release-${{ matrix.service }}
+          cache-to: type=gha,scope=release-${{ matrix.service }},mode=max
+          provenance: mode=max
+          sbom: true
+
+  desktop:
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          if [ "${{ runner.os }}" = "macOS" ]; then rustup target add aarch64-apple-darwin x86_64-apple-darwin; fi
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/visualizer/src-tauri
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/visualizer
+          tauriScript: pnpm tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: Infallible ${{ github.ref_name }}
+          releaseDraft: true
+          args: ${{ matrix.args }}
+
+  mobile:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - if: env.EXPO_TOKEN == ''
+        run: echo "::notice::EXPO_TOKEN not configured; skipping EAS build."
+      - if: env.EXPO_TOKEN != ''
+        uses: actions/checkout@v7
+      - if: env.EXPO_TOKEN != ''
+        uses: pnpm/action-setup@v6
+      - if: env.EXPO_TOKEN != ''
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - if: env.EXPO_TOKEN != ''
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - if: env.EXPO_TOKEN != ''
+        run: pnpm install --frozen-lockfile
+      - if: env.EXPO_TOKEN != ''
+        working-directory: apps/scanner
+        run: eas build --platform all --profile production --non-interactive --no-wait

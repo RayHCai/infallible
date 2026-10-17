@@ -1,0 +1,22 @@
+{
+  "name": "@infallible/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript view of the Python wire contracts (generated — do not edit src/generated.ts).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^16.0.0",
+    "prettier": "^3.9.10",
+    "typescript": "catalog:",
+    "vitest": "^5.0.4"
+  }
+}

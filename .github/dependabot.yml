@@ -1,0 +1,43 @@
+version: 2
+
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      python-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      js-minor:
+        update-types: [minor, patch]
+    ignore:
+      # Expo SDK pins these; upgrade together with `npx expo install --fix`.
+      - dependency-name: 'expo*'
+      - dependency-name: 'react-native*'
+      - dependency-name: 'react'
+      - dependency-name: 'react-dom'
+      - dependency-name: 'jest-expo'
+      - dependency-name: 'eslint-config-expo'
+
+  - package-ecosystem: cargo
+    directory: /apps/visualizer/src-tauri
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker
+    directories: [/apps/driver, /apps/firmware]
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions:
+        patterns: ['*']

@@ -1,0 +1,31 @@
+[package]
+name = "infallible-visualizer"
+version = "0.1.0"
+description = "Infallible desktop visualizer (Tauri shell; all app logic lives in TS)."
+edition = "2024"
+rust-version = "1.90"
+publish = false
+
+[lib]
+# `_lib` suffix avoids a name clash with the bin target on Windows.
+name = "infallible_visualizer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }

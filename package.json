@@ -1,0 +1,42 @@
+{
+  "name": "infallible",
+  "private": true,
+  "description": "Agent personas for usability-testing insulin pumps against MAUDE failure modes.",
+  "packageManager": "pnpm@10.34.7",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "bootstrap": "uv sync && pnpm install && uv run pre-commit install",
+    "stack:up": "docker compose up --build -d",
+    "stack:down": "docker compose down",
+    "stack:logs": "docker compose logs -f",
+    "dev:driver": "uv run --env-file .env python -m driver",
+    "dev:firmware": "uv run --env-file .env python -m firmware.host",
+    "dev:visualizer": "pnpm --filter @infallible/visualizer tauri dev",
+    "dev:scanner": "pnpm --filter @infallible/scanner start",
+    "contracts:gen": "uv run python -m infallible_contracts.export_schema packages/contracts-ts/schema/contracts.schema.json && pnpm --filter @infallible/contracts generate",
+    "lint": "pnpm lint:py && pnpm lint:ts && pnpm lint:rs",
+    "lint:py": "uv run ruff check . && uv run ruff format --check .",
+    "lint:ts": "prettier --check . && pnpm -r lint",
+    "lint:rs": "cargo fmt --manifest-path apps/visualizer/src-tauri/Cargo.toml --check && cargo clippy --manifest-path apps/visualizer/src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "format": "uv run ruff check --fix . && uv run ruff format . && prettier --write . && cargo fmt --manifest-path apps/visualizer/src-tauri/Cargo.toml",
+    "typecheck": "uv run mypy && pnpm -r typecheck",
+    "test": "uv run pytest && pnpm -r test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "prepush:ts": "pnpm -r lint && pnpm -r typecheck && pnpm -r test",
+    "assets:glb": "node assets/export-glb.mjs",
+    "assets:gallery": "uv run python -m http.server 8765 -d assets"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "three": "0.186.1",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.71.2"
+  }
+}

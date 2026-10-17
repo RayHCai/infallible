@@ -1,0 +1,30 @@
+# Per-instance pump configuration.
+#
+# `buttons` maps firmware button ids -> mesh annotation ids, so `press` actions
+# land on the right 3D region. `ui` holds the knobs that `proposed_change`
+# edits can patch for the before/after re-run (via the `configure` op).
+model: generic-pump-v1
+
+buttons:
+  up: up
+  down: down
+  ok: ok
+  back: back
+  menu: menu
+
+ui:
+  screen_width: 240
+  screen_height: 160
+  font_size: 16
+  confirm_dialogs: true
+  menu_timeout_s: 30
+  bolus_step_units: 0.1
+  bolus_max_units: 25.0
+  hold_repeat_after_ms: 600
+  hold_repeat_every_ms: 120
+
+defaults:
+  basal_rate: 0.8
+  reservoir_units: 180.0
+  battery_pct: 90
+  low_reservoir_units: 20.0

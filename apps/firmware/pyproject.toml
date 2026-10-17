@@ -1,0 +1,25 @@
+[project]
+name = "infallible-firmware"
+version = "0.1.0"
+description = "Insulin-pump emulator host (Raspberry Pi) and per-agent emulator instances."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "infallible-contracts",
+  "fastapi>=0.115",
+  "pillow>=11.0",
+  "pydantic-settings>=2.7",
+  "pyyaml>=6.0",
+  "uvicorn>=0.34",
+  "websockets>=14.0",
+]
+
+[project.scripts]
+firmware-host = "firmware.host.__main__:main"
+pump-emulator = "firmware.emulator.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "firmware"

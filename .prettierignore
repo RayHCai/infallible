@@ -1,0 +1,24 @@
+# Owned by other formatters / generated
+**/*.py
+**/*.rs
+**/*.md
+uv.lock
+pnpm-lock.yaml
+packages/contracts-ts/schema/
+data/runs/
+data/maude/
+data/tasks/
+
+# Build output & native projects
+**/dist/
+**/build/
+**/.expo/
+**/ios/
+**/android/
+apps/visualizer/src-tauri/target/
+apps/visualizer/src-tauri/gen/
+apps/scanner/modules/*/ios/
+apps/scanner/modules/*/android/
+coverage/
+.venv/
+.cache/

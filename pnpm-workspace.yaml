@@ -1,0 +1,21 @@
+packages:
+  - apps/visualizer
+  - apps/scanner
+  - packages/contracts-ts
+
+# Only these packages may run install scripts (supply-chain hardening).
+onlyBuiltDependencies:
+  - esbuild
+  - '@tauri-apps/cli'
+
+# Ship prebuilt binaries; their install scripts are not needed.
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - unrs-resolver
+
+# One version of React across the visualizer and the Expo app.
+catalog:
+  react: 19.2.3
+  react-dom: 19.2.3
+  '@types/react': ~19.2.2
+  typescript: ~6.0.3

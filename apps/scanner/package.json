@@ -1,0 +1,52 @@
+{
+  "name": "@infallible/scanner",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild --clean",
+    "doctor": "expo-doctor",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.17",
+    "@infallible/contracts": "workspace:*",
+    "expo": "~57.0.29",
+    "expo-build-properties": "~57.0.22",
+    "expo-camera": "~57.0.6",
+    "expo-constants": "~57.0.22",
+    "expo-linking": "~57.0.13",
+    "expo-router": "~57.0.27",
+    "expo-sensors": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "react": "catalog:",
+    "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-worklets": "0.10.1"
+  },
+  "devDependencies": {
+    "@react-native/metro-config": "0.86.3",
+    "@types/jest": "^29.5.14",
+    "@types/react": "catalog:",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "jest": "^29.7.0",
+    "jest-expo": "~57.0.6",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/modules/.*/(ios|android)/"
+    ]
+  }
+}

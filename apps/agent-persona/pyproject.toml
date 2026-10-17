@@ -1,0 +1,30 @@
+[project]
+name = "infallible-agent-persona"
+version = "0.1.0"
+description = "One simulated pump user: perception, persona modifiers, and the Claude decision loop."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "infallible-contracts",
+  "anthropic>=1.0",
+  "pillow>=11.0",
+  "pydantic-settings>=2.7",
+  "redis>=5.2",
+  "websockets>=14.0",
+  "typesafe-sdk[pil]>=0.7.5",
+]
+
+[project.optional-dependencies]
+# Full 3D headless mesh rendering (needs EGL/OSMesa at runtime).
+render = ["moderngl>=5.12", "numpy>=2.2", "trimesh>=4.6"]
+# Local-copy firmware mode: the agent spawns its own private emulator.
+local-firmware = ["infallible-firmware"]
+
+[project.scripts]
+agent-persona = "agent_persona.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "agent_persona"

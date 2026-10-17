@@ -1,0 +1,38 @@
+[project]
+name = "infallible-driver"
+version = "0.1.0"
+description = "Backend: HTTP/WS API, run pipeline, SQLite, object-builder and evaluator."
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "infallible-contracts",
+  "aiosqlite>=0.21",
+  "anthropic>=1.0",
+  "fastapi>=0.115",
+  "httpx>=0.28",
+  "pillow>=11.0",
+  "pydantic-settings>=2.7",
+  "pyserial>=3.5",
+  "python-multipart>=0.0.20",
+  "qrcode>=8.0",
+  "redis>=5.2",
+  "uvicorn>=0.34",
+  "websockets>=14.0",
+]
+
+[project.optional-dependencies]
+# Co-locate agent-persona in the same environment so the subprocess launcher
+# can spawn `python -m agent_persona` (what the compose image does).
+agents = ["infallible-agent-persona"]
+# Real reconstruction tier (InstantMesh / COLMAP+OpenMVS run out-of-process;
+# trimesh handles post-processing). GPU-only deps are intentionally not listed.
+reconstruction = ["trimesh>=4.6"]
+
+[project.scripts]
+driver = "driver.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "driver"

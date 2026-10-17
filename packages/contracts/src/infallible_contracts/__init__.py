@@ -1,0 +1,145 @@
+"""Wire contracts shared by driver, agent-persona, firmware and the MAUDE scripts.
+
+Every message that crosses a process boundary (HTTP, WebSocket, Redis Stream,
+files under ``data/``) is defined here exactly once. TypeScript types for the
+visualizer and scanner are generated from these models — see
+``infallible_contracts.export_schema``.
+"""
+
+from infallible_contracts.actions import (
+    Action,
+    DoneAction,
+    HoldAction,
+    PressAction,
+    ReadScreenAction,
+    RotateViewAction,
+    TurnAction,
+    WaitAction,
+    ZoomAction,
+)
+from infallible_contracts.api import (
+    BuildAccepted,
+    ConnectRequest,
+    ConnectResponse,
+    Device,
+    QrPayload,
+    StartResponse,
+    StopRequest,
+)
+from infallible_contracts.events import (
+    ActionEvent,
+    AgentError,
+    AgentEvent,
+    AgentReady,
+    TaskDispatch,
+    TaskDone,
+    TaskStarted,
+)
+from infallible_contracts.firmware import (
+    AllocateRequest,
+    AllocateResponse,
+    FirmwareFrame,
+    FirmwareInput,
+    FirmwareRequest,
+    FirmwareResponse,
+    FirmwareState,
+    ReleaseRequest,
+)
+from infallible_contracts.mesh import BoxRegion, MeshAnnotations
+from infallible_contracts.persona import (
+    Modifier,
+    ModifierId,
+    Persona,
+    PersonaAttributes,
+    PersonaFile,
+)
+from infallible_contracts.run import (
+    Agent,
+    BuildSource,
+    Interaction,
+    Run,
+    RunState,
+    TaskOutcome,
+    TaskResult,
+)
+from infallible_contracts.suggestion import (
+    ChangeType,
+    Evidence,
+    ProposedChange,
+    Suggestion,
+    SuggestionCategory,
+    SuggestionsFile,
+)
+from infallible_contracts.task import Task, TaskFile
+from infallible_contracts.ws import (
+    AgentEventMessage,
+    BuildDoneMessage,
+    BuildProgressMessage,
+    DriverMessage,
+    RunStateMessage,
+    SuggestionsReadyMessage,
+    TaskScoredMessage,
+)
+
+__all__ = [
+    'Action',
+    'ActionEvent',
+    'Agent',
+    'AgentError',
+    'AgentEvent',
+    'AgentEventMessage',
+    'AgentReady',
+    'AllocateRequest',
+    'AllocateResponse',
+    'BoxRegion',
+    'BuildAccepted',
+    'BuildDoneMessage',
+    'BuildProgressMessage',
+    'BuildSource',
+    'ChangeType',
+    'ConnectRequest',
+    'ConnectResponse',
+    'Device',
+    'DoneAction',
+    'DriverMessage',
+    'Evidence',
+    'FirmwareFrame',
+    'FirmwareInput',
+    'FirmwareRequest',
+    'FirmwareResponse',
+    'FirmwareState',
+    'HoldAction',
+    'Interaction',
+    'MeshAnnotations',
+    'Modifier',
+    'ModifierId',
+    'Persona',
+    'PersonaAttributes',
+    'PersonaFile',
+    'PressAction',
+    'ProposedChange',
+    'QrPayload',
+    'ReadScreenAction',
+    'ReleaseRequest',
+    'RotateViewAction',
+    'Run',
+    'RunState',
+    'RunStateMessage',
+    'StartResponse',
+    'StopRequest',
+    'Suggestion',
+    'SuggestionCategory',
+    'SuggestionsFile',
+    'SuggestionsReadyMessage',
+    'Task',
+    'TaskDispatch',
+    'TaskDone',
+    'TaskFile',
+    'TaskOutcome',
+    'TaskResult',
+    'TaskScoredMessage',
+    'TaskStarted',
+    'TurnAction',
+    'WaitAction',
+    'ZoomAction',
+]

@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Only run the toolchains a change actually touches.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+      ts: ${{ steps.filter.outputs.ts }}
+      rust: ${{ steps.filter.outputs.rust }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            python:
+              - '**/*.py'
+              - '**/pyproject.toml'
+              - 'uv.lock'
+              - 'data/**'
+              - 'apps/firmware/src/firmware/configs/**'
+            contracts:
+              - 'packages/contracts/**'
+              - 'packages/contracts-ts/**'
+            ts:
+              - 'apps/visualizer/**'
+              - 'apps/scanner/**'
+              - 'packages/contracts-ts/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'eslint.config.mjs'
+              - 'tsconfig.base.json'
+              - '.prettierrc.json'
+            rust:
+              - 'apps/visualizer/src-tauri/**'
+              - 'rust-toolchain.toml'
+            docker:
+              - 'apps/driver/**'
+              - 'apps/agent-persona/**'
+              - 'apps/firmware/**'
+              - 'packages/contracts/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.dockerignore'
+              - 'compose.yaml'
+
+  hygiene:
+    name: hygiene (secrets, yaml/json, Dockerfiles, workflows)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      # Toolchain hooks run in their own jobs below.
+      - run: uvx pre-commit@4.5.1 run --all-files --show-diff-on-failure
+        env:
+          SKIP: no-commit-to-branch,uv-lock,ruff-check,ruff-format,prettier,eslint,cargo-fmt,contracts-drift
+
+  python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check --output-format=github .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest --cov --cov-report=xml --cov-report=term
+      - uses: actions/upload-artifact@v5
+        with:
+          name: python-coverage
+          path: coverage.xml
+          retention-days: 7
+
+  typescript:
+    needs: changes
+    if: needs.changes.outputs.ts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --check .
+      - run: pnpm -r lint
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - name: Build visualizer frontend
+        run: pnpm --filter @infallible/visualizer exec vite build
+      - name: Expo SDK version alignment
+        working-directory: apps/scanner
+        run: pnpm exec expo install --check
+
+  contracts-drift:
+    name: contracts (Python -> TS) up to date
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: uv sync --locked
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm contracts:gen
+      - name: Fail if generated contracts changed
+        run: git diff --exit-code -- packages/contracts-ts
+
+  rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/visualizer/src-tauri
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/visualizer/src-tauri
+      # generate_context! requires frontendDist to exist at compile time.
+      - run: mkdir -p ../dist
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+      - run: cargo test --locked
+
+  docker:
+    name: docker images + compose smoke test
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build firmware image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/firmware/Dockerfile
+          tags: infallible/firmware:dev
+          load: true
+          cache-from: type=gha,scope=firmware
+          cache-to: type=gha,scope=firmware,mode=max
+      - name: Build driver image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/driver/Dockerfile
+          tags: infallible/driver:dev
+          load: true
+          cache-from: type=gha,scope=driver
+          cache-to: type=gha,scope=driver,mode=max
+      - name: Image sizes
+        run: docker images --format '| {{.Repository}}:{{.Tag}} | {{.Size}} |' infallible/* >> "$GITHUB_STEP_SUMMARY"
+      - name: Compose up (waits for healthchecks)
+        run: DOCKER_UID="$(id -u)" DOCKER_GID="$(id -g)" docker compose up -d --no-build --wait --wait-timeout 90
+      - run: curl -fsS http://localhost:8000/healthz && curl -fsS http://localhost:8100/healthz
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
+
+  # Single required status check for branch protection.
+  ci-ok:
+    if: always()
+    needs: [hygiene, python, typescript, contracts-drift, rust, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs passed (or were skipped)
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo "ok"

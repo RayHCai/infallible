@@ -1,0 +1,18 @@
+# Allowlist: the build context only ever contains what the Python images need.
+*
+!pyproject.toml
+!uv.lock
+!packages/contracts/
+!apps/driver/
+!apps/agent-persona/
+!apps/firmware/
+!scripts/pyproject.toml
+
+# ...minus anything that isn't runtime source.
+**/tests/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+apps/*/Dockerfile
