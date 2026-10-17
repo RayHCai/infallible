@@ -80,6 +80,22 @@ pnpm dev:driver                 # driver on :8000 (spawns agents as local proces
 Set `DRIVER_FIRMWARE_MODE=local` to skip the firmware host entirely; each agent then
 spawns its own private emulator.
 
+### Pump emulator on a Raspberry Pi
+
+Every emulator instance serves a pump GUI on its own port (`http://<host>:<port>/`) that
+mirrors its live screen and state and accepts button presses (mouse or arrow keys / Enter /
+Esc / M). The host's `/` page tiles every running pump. To run it on the Pi:
+
+```sh
+# on the Pi (after installing uv and cloning the repo)
+uv sync --package infallible-firmware
+FIRMWARE_HOST=0.0.0.0 FIRMWARE_INSTANCE_BIND_HOST=0.0.0.0 FIRMWARE_ADVERTISE_HOST=raspberrypi.local uv run python -m firmware.host  # --spawn N for manual pumps
+chromium-browser --kiosk http://localhost:8100/   # optional: pump grid on the HDMI output
+```
+
+On the laptop set `DRIVER_FIRMWARE_HOST_URL=http://raspberrypi.local:8100`. The Pi then
+appears as a device on the visualizer's Connect screen, and each run gets N fresh pumps on it.
+
 ## Commands
 
 | Command | What it does |

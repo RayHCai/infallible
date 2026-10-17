@@ -40,7 +40,9 @@ services:
       FIRMWARE_ADVERTISE_HOST: firmware
       FIRMWARE_MAX_INSTANCES: ${FIRMWARE_MAX_INSTANCES:-16}
       FIRMWARE_LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    ports: ['127.0.0.1:8100:8100']
+    ports:
+      - '127.0.0.1:8100:8100' # host API + pump grid at /
+      - '127.0.0.1:8200-8215:8200-8215' # per-pump GUI + protocol
     develop:
       watch:
         - { action: rebuild, path: apps/firmware/src }
