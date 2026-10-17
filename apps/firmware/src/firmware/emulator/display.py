@@ -58,7 +58,7 @@ def render(pump: PumpModel) -> Image.Image:
     return img
 
 
-def frame(pump: PumpModel) -> FirmwareFrame:
+def frame(pump: PumpModel, *, drain_audio: bool = True) -> FirmwareFrame:
     img = render(pump)
     buf = io.BytesIO()
     img.save(buf, format='PNG', optimize=True)
@@ -66,5 +66,5 @@ def frame(pump: PumpModel) -> FirmwareFrame:
         png_b64=base64.b64encode(buf.getvalue()).decode('ascii'),
         width=img.width,
         height=img.height,
-        audio=pump.drain_audio(),
+        audio=pump.drain_audio() if drain_audio else [],
     )

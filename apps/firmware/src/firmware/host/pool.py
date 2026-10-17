@@ -34,6 +34,9 @@ class InstancePool:
     def in_use(self) -> int:
         return sum(len(v) for v in self._by_run.values())
 
+    def ports(self) -> list[tuple[UUID, int]]:
+        return [(run_id, i.port) for run_id, insts in self._by_run.items() for i in insts]
+
     def _free_ports(self) -> list[int]:
         used = {i.port for insts in self._by_run.values() for i in insts}
         first = self._s.instance_port_start

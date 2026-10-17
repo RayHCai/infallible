@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pump</title>
+    <style>
+      :root {
+        --bg: #e9ecef;
+        --body: #2b3036;
+        --body-edge: #1c2024;
+        --key: #3d444c;
+        --key-down: #59626c;
+        --label: #c9d1d9;
+        --led-off: #444b52;
+        --led-alarm: #ffaa3c;
+        --led-ok: #3ccf7a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg);
+        font:
+          13px system-ui,
+          sans-serif;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .pump {
+        container-type: size;
+        height: min(94vh, 560px);
+        aspect-ratio: 9 / 16;
+        padding: 6cqh 7cqw;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4cqh;
+        border-radius: 9cqw;
+        background: linear-gradient(160deg, var(--body), var(--body-edge));
+        box-shadow: 0 10px 30px #0005;
+      }
+      .top {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--label);
+        font-size: 3cqh;
+      }
+      .led {
+        width: 3cqh;
+        height: 3cqh;
+        border-radius: 50%;
+        background: var(--led-off);
+      }
+      .led.ok {
+        background: var(--led-ok);
+      }
+      .led.alarm {
+        background: var(--led-alarm);
+        box-shadow: 0 0 2cqh var(--led-alarm);
+        animation: blink 0.8s steps(1) infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0.25;
+        }
+      }
+      .screen {
+        width: 100%;
+        aspect-ratio: 3 / 2;
+        border: 1.2cqw solid #111;
+        border-radius: 2cqw;
+        background: #0c1218;
+        image-rendering: pixelated;
+        object-fit: contain;
+      }
+      .row {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+      }
+      button {
+        border: none;
+        color: var(--label);
+        background: var(--key);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        touch-action: none;
+      }
+      button.held {
+        background: var(--key-down);
+      }
+      .row button {
+        width: 34%;
+        height: 7cqh;
+        border-radius: 3.5cqh;
+        font-size: 2.6cqh;
+        letter-spacing: 0.08em;
+      }
+      .wheel {
+        position: relative;
+        width: 64cqw;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background: var(--key);
+      }
+      .wheel button {
+        position: absolute;
+        left: 50%;
+        translate: -50% 0;
+        width: 34%;
+        height: 26%;
+        background: none;
+        font-size: 4cqh;
+        border-radius: 50%;
+      }
+      .wheel button.held {
+        background: #fff1;
+      }
+      .wheel [data-id='up'] {
+        top: 4%;
+      }
+      .wheel [data-id='down'] {
+        bottom: 4%;
+      }
+      .wheel [data-id='ok'] {
+        top: 50%;
+        translate: -50% -50%;
+        width: 42%;
+        height: 42%;
+        background: var(--body);
+        font-size: 3cqh;
+      }
+      .wheel [data-id='ok'].held {
+        background: var(--key-down);
+      }
+      .state {
+        min-width: 220px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        background: #fff;
+        color: #222;
+        font:
+          12px ui-monospace,
+          monospace;
+        white-space: pre;
+      }
+      @media (max-width: 640px) {
+        .state {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="pump">
+      <div class="top">
+        <span id="title">PUMP</span>
+        <span class="led" id="led" title="disconnected"></span>
+      </div>
+      <img class="screen" id="screen" alt="pump screen" />
+      <div class="row">
+        <button data-id="back">BACK</button>
+        <button data-id="menu">MENU</button>
+      </div>
+      <div class="wheel">
+        <button data-id="up" aria-label="up">▲</button>
+        <button data-id="ok">OK</button>
+        <button data-id="down" aria-label="down">▼</button>
+      </div>
+    </div>
+    <div class="state" id="state">connecting…</div>
+    <script>
+      const KEYS = {
+        ArrowUp: 'up',
+        ArrowDown: 'down',
+        Enter: 'ok',
+        Escape: 'back',
+        Backspace: 'back',
+        m: 'menu',
+      };
+      const $ = (id) => document.getElementById(id);
+      const buttons = Object.fromEntries(
+        [...document.querySelectorAll('button[data-id]')].map((b) => [b.dataset.id, b]),
+      );
+      document.title = $('title').textContent = `PUMP :${location.port}`;
+      let ws = null;
+
+      function send(event, target) {
+        buttons[target]?.classList.toggle('held', event === 'press');
+        if (ws?.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ event, target, at_ms: Date.now() }));
+        }
+      }
+
+      for (const [id, b] of Object.entries(buttons)) {
+        b.addEventListener('pointerdown', (e) => {
+          b.setPointerCapture(e.pointerId);
+          send('press', id);
+        });
+        for (const type of ['pointerup', 'pointercancel']) {
+          b.addEventListener(type, () => send('release', id));
+        }
+      }
+      addEventListener('keydown', (e) => {
+        if (KEYS[e.key] && !e.repeat) send('press', KEYS[e.key]);
+      });
+      addEventListener('keyup', (e) => {
+        if (KEYS[e.key]) send('release', KEYS[e.key]);
+      });
+
+      function connect() {
+        ws = new WebSocket(`ws://${location.host}/watch`);
+        ws.onmessage = (msg) => {
+          const { state, frame } = JSON.parse(msg.data);
+          $('screen').src = `data:image/png;base64,${frame.png_b64}`;
+          $('state').textContent = JSON.stringify(state, null, 2);
+          $('led').className = `led ${state.alarms.length ? 'alarm' : 'ok'}`;
+          $('led').title = state.alarms.join(', ') || 'ok';
+        };
+        ws.onclose = () => {
+          $('led').className = 'led';
+          $('led').title = 'disconnected';
+          setTimeout(connect, 1000);
+        };
+      }
+      connect();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pumps</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        background: #e9ecef;
+        font:
+          13px system-ui,
+          sans-serif;
+        color: #333;
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 12px;
+      }
+      figure {
+        margin: 0;
+      }
+      iframe {
+        width: 100%;
+        height: 440px;
+        border: none;
+      }
+      figcaption {
+        text-align: center;
+        font-family: ui-monospace, monospace;
+        color: #666;
+      }
+      a {
+        color: inherit;
+      }
+      #empty {
+        margin-top: 30vh;
+        text-align: center;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="grid"></div>
+    <p id="empty" hidden>
+      No pumps running. Start a run from the visualizer, or launch the host with
+      <code>--spawn N</code>.
+    </p>
+    <script>
+      const grid = document.getElementById('grid');
+      const tiles = new Map();
+
+      async function refresh() {
+        let instances = [];
+        try {
+          instances = await (await fetch('/instances')).json();
+        } catch {
+          return;
+        }
+        const live = new Set(instances.map((i) => i.port));
+        for (const [port, tile] of tiles) {
+          if (!live.has(port)) {
+            tile.remove();
+            tiles.delete(port);
+          }
+        }
+        for (const { run_id, port } of instances) {
+          if (tiles.has(port)) continue;
+          const url = `http://${location.hostname}:${port}/`;
+          const tile = document.createElement('figure');
+          tile.innerHTML = `<iframe src="${url}"></iframe>
+            <figcaption><a href="${url}" target="_blank">:${port}</a> · run ${run_id.slice(0, 8)}</figcaption>`;
+          grid.append(tile);
+          tiles.set(port, tile);
+        }
+        document.getElementById('empty').hidden = tiles.size > 0;
+      }
+      refresh();
+      setInterval(refresh, 2000);
+    </script>
+  </body>
+</html>

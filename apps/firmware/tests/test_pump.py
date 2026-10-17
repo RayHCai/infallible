@@ -1,12 +1,18 @@
+import asyncio
+import contextlib
 import json
+import socket
 
+import httpx
 import pytest
+from websockets.asyncio.client import ClientConnection, connect
 
+from firmware.emulator import display
 from firmware.emulator.config import load_config
 from firmware.emulator.display import frame
 from firmware.emulator.pump import PumpModel, Screen
 from firmware.emulator.server import EmulatorServer
-from infallible_contracts import FirmwareInput
+from infallible_contracts import FirmwareInput, FirmwareResponse
 
 
 class FakeClock:
@@ -108,3 +114,56 @@ async def test_server_protocol_roundtrip(clock: FakeClock) -> None:
 
     bad = await server.handle_request(json.dumps({'op': 'explode'}))
     assert not bad.ok
+
+
+async def test_viewer_snapshot_keeps_audio_for_agent(clock: FakeClock) -> None:
+    server = EmulatorServer(load_config(), clock=clock)
+    await server.handle_viewer_input('{"event": "press", "target": "ok"}')
+    await server.handle_viewer_input('not json')
+    snap = FirmwareResponse.model_validate_json(server.snapshot())
+    assert snap.state is not None
+    assert snap.state.screen == 'menu'
+    assert snap.frame is not None
+    assert snap.frame.audio == []
+    assert display.frame(server.pump).audio == ['click']
+
+
+async def test_gui_and_watch_over_network() -> None:
+    port = _free_port()
+    task = asyncio.create_task(EmulatorServer(load_config()).serve('127.0.0.1', port))
+    try:
+        ws = await _connect(f'ws://127.0.0.1:{port}/watch')
+        async with ws:
+            first = FirmwareResponse.model_validate_json(await ws.recv())
+            assert first.state is not None
+            assert first.state.screen == 'home'
+            await ws.send(json.dumps({'event': 'press', 'target': 'ok'}))
+            pushed = FirmwareResponse.model_validate_json(await ws.recv())
+            assert pushed.state is not None
+            assert pushed.state.screen == 'menu'
+
+        async with httpx.AsyncClient() as http:
+            page = await http.get(f'http://127.0.0.1:{port}/')
+        assert page.status_code == 200
+        assert page.headers['content-type'].startswith('text/html')
+        assert '/watch' in page.text
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        port: int = s.getsockname()[1]
+        return port
+
+
+async def _connect(uri: str) -> ClientConnection:
+    for _ in range(50):
+        try:
+            return await connect(uri)
+        except OSError:
+            await asyncio.sleep(0.05)
+    raise AssertionError(f'could not connect to {uri}')
