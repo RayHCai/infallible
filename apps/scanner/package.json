@@ -14,7 +14,7 @@
     "test": "jest --passWithNoTests"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~57.0.17",
+    "@expo/metro-runtime": "~58.0.14",
     "@infallible/contracts": "workspace:*",
     "expo": "~57.0.29",
     "expo-build-properties": "~57.0.22",
