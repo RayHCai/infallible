@@ -1,6 +1,6 @@
 import type { Action, BuildSource, DriverMessage, Run, TaskOutcome } from '@infallible/contracts';
 
-export type AgentStatus = 'starting' | 'ready' | 'working' | 'idle' | 'error';
+type AgentStatus = 'starting' | 'ready' | 'working' | 'idle' | 'error';
 
 export interface ActionRecord {
   step: number;
@@ -23,6 +23,8 @@ export interface AgentView {
   /** Every action per task, in order; this is what the sandbox replays. */
   history: Record<string, ActionRecord[]>;
   outcomes: Record<string, TaskOutcome>;
+  /** Driver's explanation for failed/errored tasks. */
+  reasons: Record<string, string>;
 }
 
 export interface RunView {
@@ -52,6 +54,7 @@ const newAgent = (agentId: string): AgentView => ({
   lastError: null,
   history: {},
   outcomes: {},
+  reasons: {},
 });
 
 function patchAgent(state: RunView, agentId: string, patch: (a: AgentView) => Partial<AgentView>) {
@@ -83,6 +86,7 @@ export function runReducer(state: RunView, message: DriverMessage): RunView {
         failed: a.failed + (message.outcome === 'failed' ? 1 : 0),
         errored: a.errored + (message.outcome === 'errored' ? 1 : 0),
         outcomes: { ...a.outcomes, [message.task_id]: message.outcome },
+        reasons: message.reason ? { ...a.reasons, [message.task_id]: message.reason } : a.reasons,
       }));
     case 'suggestions_ready':
       return { ...state, suggestionsCount: message.count };

@@ -14,15 +14,12 @@
   },
   "dependencies": {
     "@infallible/contracts": "workspace:*",
-    "@tauri-apps/api": "^2.12.3",
-    "qrcode": "^1.5.4",
     "react": "catalog:",
     "react-dom": "catalog:",
     "three": "^0.186.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.1",
-    "@types/qrcode": "^1.5.6",
     "@types/react": "catalog:",
     "@types/react-dom": "~19.2.2",
     "@types/three": "^0.186.0",

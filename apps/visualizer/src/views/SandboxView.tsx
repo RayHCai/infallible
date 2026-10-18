@@ -5,7 +5,7 @@ import type { ActionRecord, AgentView } from '../state/runStore';
 import { describeAction, poseAfter } from '../three/eyePose';
 import type { Sandbox } from '../three/sandbox';
 import { useSandbox } from '../three/useSandbox';
-import { ArrowLeft, Pause, Play, StatusIcon } from '../ui/icons';
+import { Pause, Play, StatusIcon } from '../ui/icons';
 import { LiveFrame } from './LiveFrame';
 
 export type SandboxMode =
@@ -26,8 +26,9 @@ interface Props {
   personaByAgent: Map<string, string>;
   tasks: Task[];
   suggestions: Suggestion[];
-  onClose: () => void;
-  onOpen: (mode: SandboxMode) => void;
+  /** False when the persona card already sits in the detail column. */
+  showPersona: boolean;
+  onOpenAgent: (agentId: string, taskId: string | null) => void;
 }
 
 type SandboxRef = RefObject<Sandbox | null>;
@@ -130,6 +131,7 @@ function useChange(
   return { after, setAfter };
 }
 
+/** Column 4 of the browser: the 3D scene plus what the agent is doing in it. */
 export function SandboxView(props: Props) {
   const {
     mode,
@@ -140,14 +142,15 @@ export function SandboxView(props: Props) {
     personaByAgent,
     tasks,
     suggestions,
-    onClose,
-    onOpen,
+    showPersona,
+    onOpenAgent,
   } = props;
   const { containerRef, sandboxRef } = useSandbox(true, meshUrl, annotations);
 
   const agent = mode.kind === 'change' ? null : (agents[mode.agentId] ?? null);
   const persona = agent ? personas.get(personaByAgent.get(agent.agentId) ?? '') : undefined;
   const taskId = mode.kind === 'replay' ? mode.taskId : (agent?.currentTaskId ?? null);
+  const task = tasks.find((t) => t.id === taskId);
   const actions = (agent && taskId ? agent.history[taskId] : undefined) ?? NO_ACTIONS;
   const suggestion =
     mode.kind === 'change' ? (suggestions.find((s) => s.id === mode.suggestionId) ?? null) : null;
@@ -156,36 +159,32 @@ export function SandboxView(props: Props) {
   const replay = useReplay(actions, sandboxRef, mode.kind === 'replay');
   const change = useChange(suggestion, sandboxRef, annotations);
 
+  const chipsRef = useRef<HTMLOListElement>(null);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
+    const chip = chipsRef.current?.children[Math.min(replay.cursor, actions.length - 1)];
+    chip?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [replay.cursor, actions.length]);
 
-  const shownStep = mode.kind === 'replay' ? replay.cursor : actions.length;
-  const current = actions[shownStep - 1];
-
-  return (
-    <div className="sandbox">
-      <div ref={containerRef} className="sandbox-canvas" />
-      <div className="hud">
-        <div className="hud-left">
-          <button type="button" className="ghost small" onClick={onClose}>
-            <ArrowLeft />
-            Back
-          </button>
-
-          {mode.kind === 'change' ? (
-            suggestion && (
-              <article key={suggestion.id} className="card hud-card">
-                <span className={`tag tag-${suggestion.category}`}>{suggestion.category}</span>
-                <h3>{suggestion.title}</h3>
-                <p className="muted">{suggestion.rationale}</p>
-                <div className="segmented">
+  if (mode.kind === 'change') {
+    return (
+      <>
+        <div className="col-head">
+          <span className="eyebrow">Sandbox</span>
+          <span className="meta">Proposed change</span>
+        </div>
+        <div className="col-body">
+          <div className="sb">
+            <div ref={containerRef} className="viewport">
+              {suggestion && (
+                <span className="vp-cap">
+                  <span className="tag">{change.after ? 'After' : 'Before'}</span>
+                  {suggestion.title}
+                </span>
+              )}
+            </div>
+            {suggestion && (
+              <div className="ba">
+                <div className="seg" role="group" aria-label="Compare">
                   <button
                     type="button"
                     className={change.after ? '' : 'on'}
@@ -205,179 +204,159 @@ export function SandboxView(props: Props) {
                     After
                   </button>
                 </div>
-                {suggestion.evidence.length > 0 && (
-                  <>
-                    <span className="eyebrow">Evidence</span>
-                    <ul className="rows rows-compact">
-                      {suggestion.evidence.map((e) => (
-                        <li key={`${e.agent_id}:${e.task_id}:${e.step}`}>
-                          <button
-                            type="button"
-                            className="row"
-                            onClick={() => {
-                              onOpen({ kind: 'replay', agentId: e.agent_id, taskId: e.task_id });
-                            }}
-                          >
-                            <span className="row-title">
-                              {personas.get(personaByAgent.get(e.agent_id) ?? '')?.name ?? 'agent'}
-                            </span>
-                            <span className="row-meta">
-                              {tasks.find((t) => t.id === e.task_id)?.name ?? 'task'}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </article>
-            )
-          ) : (
-            <>
-              <article className="card hud-card">
-                <header className="card-head">
-                  <span className="avatar">{(persona?.name ?? 'A').slice(0, 1)}</span>
-                  <span className="row-body">
-                    <h3>{persona?.name ?? agent?.agentId.slice(0, 8)}</h3>
-                    {persona && (
-                      <span className="muted">
-                        {persona.attributes.age}, {persona.attributes.gender}
-                      </span>
-                    )}
+                <span className="ba-cap">{suggestion.proposed_change.type.replace(/_/g, ' ')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const shownStep = mode.kind === 'replay' ? replay.cursor : actions.length;
+  const current = actions[shownStep - 1];
+  const outcome = agent && taskId ? agent.outcomes[taskId] : undefined;
+  const failure =
+    agent && taskId && (outcome === 'failed' || outcome === 'errored')
+      ? (agent.reasons[taskId] ?? 'No reason reported.')
+      : null;
+  const name = persona?.name ?? agent?.agentId.slice(0, 8) ?? 'agent';
+  const kindLabel = mode.kind === 'live' ? 'Live' : 'Replay';
+
+  return (
+    <>
+      <div className="col-head">
+        <span className="eyebrow">Sandbox</span>
+        <span className="meta">
+          {kindLabel}
+          {task && ` · ${task.name}`}
+        </span>
+      </div>
+      <div className="col-body">
+        <div className="sb">
+          {showPersona && agent && (
+            <div className="who-strip">
+              <div className="line">
+                <span className="av">{name.slice(0, 1)}</span>
+                <span className="name">{name}</span>
+                {persona && (
+                  <span className="muted">
+                    {persona.attributes.age} · {persona.attributes.gender}
                   </span>
-                  {agent && <span className={`pill pill-${agent.status}`}>{agent.status}</span>}
-                </header>
-                {persona && <p className="muted">{persona.description}</p>}
-                {persona && persona.attributes.modifiers.length > 0 && (
-                  <div className="chips">
-                    {persona.attributes.modifiers.map((m) => (
+                )}
+                <span className={`pill ${agent.status}`}>{agent.status}</span>
+              </div>
+              <div className="line">
+                <div className="chips">
+                  {persona && persona.attributes.modifiers.length > 0 ? (
+                    persona.attributes.modifiers.map((m) => (
                       <span key={m.id} className="chip">
                         {m.id.replace('_', ' ')}
                       </span>
-                    ))}
-                  </div>
-                )}
-              </article>
-
-              <article className="card hud-card">
-                <header className="card-head">
-                  <span className="eyebrow">
-                    {mode.kind === 'replay'
-                      ? `Step ${shownStep} of ${actions.length}`
-                      : `Step ${shownStep}`}
-                  </span>
-                  <span className="muted">{tasks.find((t) => t.id === taskId)?.name}</span>
-                </header>
-                <div key={shownStep} className="action-now">
-                  {current ? describeAction(current.chosen) : 'waiting'}
+                    ))
+                  ) : (
+                    <span className="muted">No modifiers</span>
+                  )}
                 </div>
-                {current?.reasoning && <q className="reasoning">{current.reasoning}</q>}
-                {mode.kind === 'live' && <LiveFrame endpoint={agent?.frameEndpoint ?? null} />}
-              </article>
-            </>
+                <div className="tdots" role="group" aria-label="This persona's tasks">
+                  {tasks.map((t) => {
+                    const o = agent.outcomes[t.id];
+                    const live = agent.currentTaskId === t.id && !o;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={t.id === taskId ? 'on' : ''}
+                        title={t.name}
+                        aria-label={t.name}
+                        disabled={!(t.id in agent.history)}
+                        onClick={() => {
+                          onOpenAgent(agent.agentId, t.id);
+                        }}
+                      >
+                        <StatusIcon status={o ?? (live ? 'active' : 'pending')} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           )}
-        </div>
 
-        <div className="hud-right">
-          {mode.kind === 'change' ? (
-            <article className="card hud-card">
-              <header className="card-head">
-                <h3>Suggestions</h3>
-                <span className="count">{suggestions.length}</span>
-              </header>
-              <ul className="rows rows-compact">
-                {suggestions.map((s) => (
-                  <li key={s.id}>
+          <div ref={containerRef} className="viewport">
+            <span className="vp-cap">
+              <span className="tag">{kindLabel}</span>
+              {task?.name}
+            </span>
+          </div>
+
+          <div className="sb-body">
+            <div className={`step ${mode.kind === 'live' && agent?.frameEndpoint ? 'live' : ''}`}>
+              <div>
+                <span className="eyebrow">
+                  {mode.kind === 'replay'
+                    ? `Step ${shownStep} of ${actions.length}`
+                    : `Step ${shownStep}`}
+                </span>
+                {task && <span className="muted"> · {task.name}</span>}
+                <div key={shownStep} className="action">
+                  {current ? describeAction(current.chosen) : 'Waiting to start'}
+                </div>
+                {current?.reasoning && <q className="reason">{current.reasoning}</q>}
+              </div>
+              {mode.kind === 'live' && <LiveFrame endpoint={agent?.frameEndpoint ?? null} />}
+            </div>
+            {failure && (
+              <div className="failure">
+                <span className="k">{outcome === 'errored' ? 'Errored' : 'Failed'}</span>
+                <p>{failure}</p>
+              </div>
+            )}
+          </div>
+
+          {mode.kind === 'replay' && (
+            <div className="transport">
+              <button
+                type="button"
+                className="ibtn"
+                onClick={replay.toggle}
+                aria-label={replay.playing && !replay.ended ? 'Pause' : 'Play'}
+              >
+                {replay.playing && !replay.ended ? <Pause /> : <Play />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={actions.length}
+                value={replay.cursor}
+                aria-label="Scrub"
+                onChange={(e) => {
+                  replay.scrub(Number(e.target.value));
+                }}
+              />
+              <span className="pos">
+                {replay.cursor}/{actions.length}
+              </span>
+              <ol ref={chipsRef} className="chips-steps">
+                {actions.map((a, i) => (
+                  <li key={a.step}>
                     <button
                       type="button"
-                      className={`row ${s.id === suggestion?.id ? 'row-selected' : ''}`}
+                      className={i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : ''}
                       onClick={() => {
-                        onOpen({ kind: 'change', suggestionId: s.id });
+                        replay.scrub(i + 1);
                       }}
                     >
-                      <span className={`tag tag-${s.category}`}>{s.category}</span>
-                      <span className="row-title">{s.title}</span>
+                      <sup>{i + 1}</sup>
+                      {describeAction(a.chosen)}
                     </button>
                   </li>
                 ))}
-              </ul>
-            </article>
-          ) : (
-            agent && (
-              <article className="card hud-card">
-                <header className="card-head">
-                  <h3>Tasks</h3>
-                  <span className="count">
-                    {Object.keys(agent.outcomes).length}/{tasks.length}
-                  </span>
-                </header>
-                <ul className="rows rows-compact">
-                  {tasks.map((t) => {
-                    const outcome = agent.outcomes[t.id];
-                    const live = agent.currentTaskId === t.id && !outcome;
-                    return (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          className={`row ${t.id === taskId ? 'row-selected' : ''}`}
-                          disabled={!(t.id in agent.history)}
-                          onClick={() => {
-                            onOpen(
-                              live
-                                ? { kind: 'live', agentId: agent.agentId }
-                                : { kind: 'replay', agentId: agent.agentId, taskId: t.id },
-                            );
-                          }}
-                        >
-                          <StatusIcon status={outcome ?? (live ? 'active' : 'pending')} />
-                          <span className="row-title">{t.name}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </article>
-            )
+              </ol>
+            </div>
           )}
         </div>
-
-        {mode.kind === 'replay' && (
-          <div className="transport card">
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={replay.toggle}
-              aria-label={replay.playing && !replay.ended ? 'Pause' : 'Play'}
-            >
-              {replay.playing && !replay.ended ? <Pause /> : <Play />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={actions.length}
-              value={replay.cursor}
-              onChange={(e) => {
-                replay.scrub(Number(e.target.value));
-              }}
-            />
-            <ol className="steps">
-              {actions.map((a, i) => (
-                <li key={a.step}>
-                  <button
-                    type="button"
-                    className={i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : ''}
-                    onClick={() => {
-                      replay.scrub(i + 1);
-                    }}
-                  >
-                    {describeAction(a.chosen)}
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
       </div>
-    </div>
+    </>
   );
 }

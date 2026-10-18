@@ -1,7 +1,7 @@
 import type { Device } from '@infallible/contracts';
 import { useEffect, useState } from 'react';
 
-import { driver } from '../sim/mockDriver';
+import { driver } from '../api/driver';
 import { useSandbox } from '../three/useSandbox';
 
 const POLL_MS = 2000;

@@ -9,18 +9,21 @@ import type {
 } from '@infallible/contracts';
 import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
-// Mock until the driver is wired: swap for `api/driver` + `api/driverSocket`.
-import { driver } from './sim/mockDriver';
+import { driver } from './api/driver';
+import { connectDriverSocket } from './api/driverSocket';
+import { DRIVER_URL } from './config';
 import { initialRunView, runReducer } from './state/runStore';
-import { PageSwitch, Presence } from './ui/Transition';
+import { useSnapshotServer } from './three/useSnapshotServer';
+import { PageSwitch } from './ui/Transition';
 import { BuildingView } from './views/BuildingView';
 import { ConnectView } from './views/ConnectView';
-import { modeKey, type SandboxMode, SandboxView } from './views/SandboxView';
-import { SimView } from './views/SimView';
+import type { SandboxMode } from './views/SandboxView';
+import { type Group, type Selection, SimView } from './views/SimView';
 import { StartView } from './views/StartView';
 
 const TERMINAL: RunState[] = ['completed', 'stopped', 'failed'];
 const NOTICE_MS = 4000;
+const HOME: Selection = { group: 'tasks', item: null };
 
 /** Toast that dismisses itself; remount (key) to show it again. */
 function Notice({ children }: { children: ReactNode }) {
@@ -44,13 +47,19 @@ export function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [annotations, setAnnotations] = useState<MeshAnnotations | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(HOME);
   const [sandbox, setSandbox] = useState<SandboxMode | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => driver.subscribe(dispatch), []);
+  useEffect(() => connectDriverSocket(dispatch), []);
 
+  const runId = view.run?.id ?? null;
+  const state = view.run?.state;
+  // The driver serves a relative mesh path.
+  const meshUrl = view.build.meshUrl ? `${DRIVER_URL}${view.build.meshUrl}` : null;
+
+  // Refetched per run so a driver started after the visualizer still gets picked up.
   useEffect(() => {
     Promise.all([driver.personas(), driver.tasks()])
       .then(([p, t]) => {
@@ -60,16 +69,22 @@ export function App() {
       .catch(() => {
         /* driver not up yet; the WS reconnect loop will surface state */
       });
-  }, []);
-
-  const runId = view.run?.id ?? null;
-  const state = view.run?.state;
+  }, [runId]);
 
   useEffect(() => {
     if (!runId || state !== 'running') return;
     driver.agents(runId).then(setAgents, () => undefined);
     driver.annotations(runId).then(setAnnotations, () => undefined);
   }, [runId, state]);
+
+  const frameEndpoints = useMemo(
+    () =>
+      state === 'running'
+        ? Object.values(view.agents).flatMap((a) => (a.frameEndpoint ? [a.frameEndpoint] : []))
+        : [],
+    [state, view.agents],
+  );
+  useSnapshotServer(meshUrl, annotations, frameEndpoints);
 
   useEffect(() => {
     if (!runId || state !== 'completed') return;
@@ -96,16 +111,12 @@ export function App() {
   const startRun = useCallback(() => {
     void act(async () => {
       setSandbox(null);
-      setSelectedTask(null);
+      setSelection(HOME);
       setSuggestions([]);
       setAgents([]);
       setStart(await driver.start());
     });
   }, [act]);
-
-  const closeSandbox = useCallback(() => {
-    setSandbox(null);
-  }, []);
 
   const openAgent = useCallback(
     (agentId: string, taskId: string | null) => {
@@ -115,14 +126,63 @@ export function App() {
         setSandbox({ kind: 'replay', agentId, taskId });
         return;
       }
-      if (state === 'running') {
+      if (state === 'running' && (!taskId || taskId === a.currentTaskId)) {
         setSandbox({ kind: 'live', agentId });
         return;
       }
-      const target = taskId ?? selectedTask ?? a.currentTaskId;
+      const target = taskId ?? a.currentTaskId ?? Object.keys(a.outcomes).pop() ?? null;
       if (target) setSandbox({ kind: 'replay', agentId, taskId: target });
     },
-    [view.agents, state, selectedTask],
+    [view.agents, state],
+  );
+
+  const openChange = useCallback((suggestionId: string) => {
+    setSelection({ group: 'suggestions', item: suggestionId });
+    setSandbox({ kind: 'change', suggestionId });
+  }, []);
+
+  const selectGroup = useCallback((group: Group) => {
+    setSelection({ group, item: null });
+    setSandbox(null);
+  }, []);
+
+  const selectItem = useCallback(
+    (item: string) => {
+      switch (selection.group) {
+        case 'tasks':
+          setSelection({ group: 'tasks', item });
+          setSandbox(null);
+          break;
+        case 'personas':
+          setSelection({ group: 'personas', item });
+          openAgent(item, null);
+          break;
+        case 'suggestions':
+          openChange(item);
+          break;
+        case null:
+          break;
+      }
+    },
+    [selection.group, openAgent, openChange],
+  );
+
+  /** Cut the selection path back to `level` (0 = run, 1 = group, 2 = item). */
+  const trim = useCallback(
+    (level: number) => {
+      if (level <= 0) {
+        setSelection({ group: null, item: null });
+        setSandbox(null);
+      } else if (level === 1) {
+        setSelection({ group: selection.group, item: null });
+        setSandbox(null);
+      } else if (selection.group === 'suggestions' && selection.item) {
+        openChange(selection.item);
+      } else {
+        setSandbox(null);
+      }
+    },
+    [selection, openChange],
   );
 
   const personaByAgent = useMemo(() => new Map(agents.map((a) => [a.id, a.persona_id])), [agents]);
@@ -137,6 +197,20 @@ export function App() {
     if (state === 'connect') return 'connect';
     return 'sim';
   })();
+
+  useEffect(() => {
+    if (page !== 'sim') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const depth =
+        sandbox && sandbox.kind !== 'change' ? 3 : selection.item ? 2 : selection.group ? 1 : 0;
+      if (depth > 0) trim(depth === 2 && selection.group === 'suggestions' ? 1 : depth - 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [page, sandbox, selection, trim]);
 
   const body = (() => {
     switch (page) {
@@ -156,7 +230,7 @@ export function App() {
       case 'connect':
         return (
           <ConnectView
-            meshUrl={view.build.meshUrl}
+            meshUrl={meshUrl}
             busy={busy}
             onConnect={(deviceId) => void act(() => driver.connect(deviceId))}
           />
@@ -164,46 +238,32 @@ export function App() {
       case 'sim':
         return (
           <SimView
+            runId={runId ?? ''}
             state={state ?? 'running'}
             agents={agentViews}
             personas={personas}
             personaByAgent={personaByAgent}
             tasks={tasks}
             suggestions={suggestions}
-            selectedTask={selectedTask}
-            onSelectTask={setSelectedTask}
+            selection={selection}
+            sandbox={sandbox}
+            meshUrl={meshUrl}
+            annotations={annotations}
+            onSelectGroup={selectGroup}
+            onSelectItem={selectItem}
+            onTrim={trim}
             onOpenAgent={openAgent}
-            onOpenSuggestions={() => {
-              const first = suggestions[0];
-              if (first) setSandbox({ kind: 'change', suggestionId: first.id });
-            }}
+            onOpenChange={openChange}
           />
         );
     }
   })();
 
   return (
-    <main className={sandbox ? 'pushed' : ''}>
+    <main>
       {error && <p className="toast">{error}</p>}
       {state === 'completed' && <Notice key={runId}>Simulation complete</Notice>}
       <PageSwitch id={page}>{body}</PageSwitch>
-      <Presence show={sandbox !== null} className="overlay">
-        {sandbox && (
-          <SandboxView
-            key={modeKey(sandbox)}
-            mode={sandbox}
-            meshUrl={view.build.meshUrl}
-            annotations={annotations}
-            agents={view.agents}
-            personas={personas}
-            personaByAgent={personaByAgent}
-            tasks={tasks}
-            suggestions={suggestions}
-            onClose={closeSandbox}
-            onOpen={setSandbox}
-          />
-        )}
-      </Presence>
     </main>
   );
 }

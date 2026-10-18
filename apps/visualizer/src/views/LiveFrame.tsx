@@ -1,21 +1,43 @@
 import { useEffect, useState } from 'react';
 
+/** What the persona heard since its last snapshot, already through its ears. */
+interface HeardSound {
+  heard: string;
+  wav_b64: string | null;
+}
+
+interface FrameMeta {
+  snapshot: number;
+  audio: HeardSound[];
+}
+
 /**
  * Pixel-identical view of what the agent's model saw: a direct WebSocket to
  * that agent-persona's frame endpoint (never via the driver). One at a time.
  */
 export function LiveFrame({ endpoint }: { endpoint: string | null }) {
   const [src, setSrc] = useState<string | null>(null);
-  const [audio, setAudio] = useState<string[]>([]);
+  const [heard, setHeard] = useState<string[]>([]);
 
   useEffect(() => {
     if (!endpoint) return;
     const ws = new WebSocket(`ws://${endpoint}`);
     ws.binaryType = 'blob';
+    const ctx = new AudioContext();
     let url: string | null = null;
+    let played = -1;
+    let queue = Promise.resolve();
     ws.onmessage = (ev: MessageEvent<Blob | string>) => {
       if (typeof ev.data === 'string') {
-        setAudio((JSON.parse(ev.data) as { audio: string[] }).audio);
+        const meta = JSON.parse(ev.data) as FrameMeta;
+        setHeard(meta.audio.map((a) => a.heard));
+        // Each snapshot is published twice (before and after planning); play it once.
+        if (meta.snapshot !== played) {
+          played = meta.snapshot;
+          for (const { wav_b64: wav } of meta.audio) {
+            if (wav) queue = queue.then(() => play(ctx, wav)).catch(() => undefined);
+          }
+        }
         return;
       }
       const next = URL.createObjectURL(ev.data);
@@ -25,9 +47,10 @@ export function LiveFrame({ endpoint }: { endpoint: string | null }) {
     };
     return () => {
       ws.close();
+      void ctx.close();
       if (url) URL.revokeObjectURL(url);
       setSrc(null);
-      setAudio([]);
+      setHeard([]);
     };
   }, [endpoint]);
 
@@ -39,7 +62,21 @@ export function LiveFrame({ endpoint }: { endpoint: string | null }) {
       ) : (
         <span className="frame-empty">connecting</span>
       )}
-      {audio.length > 0 && <figcaption>heard {audio.join(', ')}</figcaption>}
+      {heard.length > 0 && <figcaption>heard {heard.join('; ')}</figcaption>}
     </figure>
   );
+}
+
+async function play(ctx: AudioContext, wavB64: string): Promise<void> {
+  const bytes = Uint8Array.from(atob(wavB64), (c) => c.charCodeAt(0));
+  const buffer = await ctx.decodeAudioData(bytes.buffer);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  await new Promise<void>((resolve) => {
+    source.onended = () => {
+      resolve();
+    };
+    source.start();
+  });
 }

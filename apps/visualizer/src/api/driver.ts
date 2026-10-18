@@ -1,5 +1,6 @@
 import type {
   Agent,
+  BuildAccepted,
   ConnectResponse,
   Device,
   MeshAnnotations,
@@ -42,6 +43,7 @@ const post = <T>(path: string, body?: unknown) =>
 export const driver = {
   start: () => post<StartResponse>('/start'),
   stop: (runId: string) => post<Run>('/stop', { run_id: runId }),
+  skipScan: (runId: string) => post<BuildAccepted>(`/runs/${runId}/skip-scan`),
   connect: (deviceId: string | null = null) =>
     post<ConnectResponse>('/connect', { device_id: deviceId }),
   devices: () => request<Device[]>('/devices'),

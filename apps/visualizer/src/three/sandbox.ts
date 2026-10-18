@@ -1,19 +1,27 @@
-import type { Action, BoxRegion, MeshAnnotations, ProposedChange } from '@infallible/contracts';
+import type {
+  Action,
+  BoxRegion,
+  EyePose,
+  MeshAnnotations,
+  ProposedChange,
+} from '@infallible/contracts';
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-import fallbackPumpUrl from '../../../../assets/models/glb/minimed-780g.glb?url';
-import { type EyePose, INITIAL_POSE } from './eyePose';
+import {
+  configureRenderer,
+  eyePosition,
+  FOCUS,
+  FOV,
+  loadPump,
+  normalise,
+  screenPlane,
+  stage,
+} from './deviceScene';
+import { INITIAL_POSE } from './eyePose';
 
-export const FALLBACK_MESH_URL: string = fallbackPumpUrl;
-
-const BG = 0xf7f6f3;
 const INK = 0x141414;
-const ACCENT = 0x2563eb;
-const OK = 0x1f8a4c;
-/** Pump centre after normalisation (height 1, standing on the grid). */
-const FOCUS = new THREE.Vector3(0, 0.5, 0);
+const ACCENT = 0x1b1a17;
+const OK = 0x2f6b3a;
 const HOME = new THREE.Vector3(2.025, 1.25, 3.075);
 const UP = new THREE.Vector3(0, 1, 0);
 /** Assumed real pump height (≈ a deck of cards); one scene unit is one pump height. */
@@ -152,29 +160,6 @@ function screenTexture(scale = 1, dialog: string | null = null) {
   return t;
 }
 
-/** Axis-aligned bounds of a loaded model, skipping parts flagged `fitIgnore` (tubing). */
-function fitBox(root: THREE.Object3D) {
-  const box = new THREE.Box3();
-  const v = new THREE.Vector3();
-  root.updateWorldMatrix(true, true);
-  const isMesh = (o: THREE.Object3D): o is THREE.Mesh => (o as THREE.Mesh).isMesh;
-  root.traverse((o) => {
-    if (!isMesh(o)) return;
-    for (let p: THREE.Object3D | null = o; p; p = p.parent) {
-      if (p.userData['fitIgnore'] === true) return;
-    }
-    const g = o.geometry;
-    if (!g.boundingBox) g.computeBoundingBox();
-    const bb = g.boundingBox;
-    if (!bb) return;
-    for (let i = 0; i < 8; i++) {
-      v.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z);
-      box.expandByPoint(v.applyMatrix4(o.matrixWorld));
-    }
-  });
-  return box;
-}
-
 /**
  * Editor-style sandbox: grid floor, fly camera (drag to look, WASD to move),
  * the pump normalised to one unit tall, annotation markers, the agent's eye,
@@ -183,7 +168,7 @@ function fitBox(root: THREE.Object3D) {
 export class Sandbox {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(42, 1, 0.01, 60);
+  private readonly camera = new THREE.PerspectiveCamera(FOV, 1, 0.01, 60);
   private readonly pump = new THREE.Group();
   /** Raw mesh space: annotation anchors are expressed here (metres). */
   private readonly mesh = new THREE.Group();
@@ -225,24 +210,9 @@ export class Sandbox {
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
-    this.renderer.setClearColor(BG);
+    configureRenderer(this.renderer);
     container.appendChild(this.renderer.domElement);
-
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
-    this.scene.environment = this.env;
-    this.scene.environmentIntensity = 0.9;
-
-    const key = new THREE.DirectionalLight(0xffffff, 1.6);
-    key.position.set(1.5, 3, 2);
-    const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5);
-    fill.position.set(-2, 1, -1.5);
-    this.scene.add(key, fill, new THREE.HemisphereLight(0xffffff, 0xb8b4ad, 0.5));
-
-    this.scene.add(new THREE.GridHelper(8, 32, 0xc9c5be, 0xe0ddd6));
+    this.env = stage(this.renderer, this.scene);
 
     this.pump.add(this.mesh);
     this.gaze = new THREE.Line(
@@ -277,17 +247,7 @@ export class Sandbox {
   /** Load a GLB (falling back to the bundled pump), normalise it to one unit tall. */
   async loadMesh(url: string | null): Promise<void> {
     const id = ++this.loadId;
-    const loader = new GLTFLoader();
-    let root: THREE.Object3D | null = null;
-    for (const candidate of [url, FALLBACK_MESH_URL]) {
-      if (!candidate) continue;
-      try {
-        root = (await loader.loadAsync(candidate)).scene;
-        break;
-      } catch (err: unknown) {
-        console.warn('pump mesh failed to load', candidate, err);
-      }
-    }
+    const root = await loadPump(url);
     if (id !== this.loadId) return;
     if (root) this.setModel(root);
   }
@@ -354,7 +314,7 @@ export class Sandbox {
   }
 
   /** Fly the camera back to its home framing. */
-  reframe(): void {
+  private reframe(): void {
     this.tween = { pos: HOME.clone(), ...lookAngles(HOME, FOCUS) };
   }
 
@@ -380,16 +340,7 @@ export class Sandbox {
   }
 
   private setModel(root: THREE.Object3D) {
-    // Measure before parenting so the box is in mesh space, not the scaled world.
-    const box = fitBox(root);
-    this.mesh.clear();
-    this.mesh.add(root);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    this.meshSize = size;
-    const s = 1 / size.y;
-    this.pump.scale.setScalar(s);
-    this.mesh.position.set(-center.x, -box.min.y, -center.z);
+    this.meshSize = normalise(this.pump, this.mesh, root);
     this.rebuildMarkers();
   }
 
@@ -403,12 +354,7 @@ export class Sandbox {
     const ann = this.annotations;
     if (!ann) return;
     const { x: sx, y: sy } = this.meshSize;
-    const screen = new THREE.Mesh(
-      new THREE.PlaneGeometry(ann.screen.w * sx, ann.screen.h * sy),
-      new THREE.MeshBasicMaterial({ map: screenTexture(), toneMapped: false }),
-    );
-    screen.position.set(...ann.screen.anchor);
-    screen.position.z += 0.00005;
+    const screen = screenPlane(ann.screen, this.meshSize, screenTexture());
     this.mesh.add(screen);
     this.screen = screen;
     for (const region of [ann.screen, ...ann.buttons]) this.addMarker(region, sx, sy);
@@ -512,15 +458,6 @@ export class Sandbox {
     torso.scale.z = 0.5;
 
     this.eye.add(neck, torso, this.head);
-  }
-
-  private eyePosition(pose: EyePose, out: THREE.Vector3) {
-    const c = Math.cos(pose.pitch);
-    return out.set(
-      pose.radius * c * Math.sin(pose.yaw),
-      FOCUS.y + pose.radius * Math.sin(pose.pitch),
-      pose.radius * c * Math.cos(pose.yaw),
-    );
   }
 
   private markerWorld(id: string) {
@@ -890,7 +827,7 @@ export class Sandbox {
       radius: this.pose.radius + (this.poseTarget.radius - this.pose.radius) * a,
     };
     if (this.eye.visible) {
-      const p = this.eyePosition(this.pose, this.eye.position);
+      const p = eyePosition(this.pose, this.eye.position);
       this.eye.rotation.set(0, Math.atan2(FOCUS.x - p.x, FOCUS.z - p.z), 0);
       this.eye.updateMatrixWorld();
       this.head.lookAt(FOCUS);

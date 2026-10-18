@@ -2,79 +2,83 @@ import type { TaskOutcome } from '@infallible/contracts';
 
 import type { TaskStatus } from '../state/runStore';
 
-const svg = { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true };
-const stroke = { stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' } as const;
+const svg = { viewBox: '0 0 16 16', 'aria-hidden': true } as const;
 
-export const Check = () => (
-  <svg {...svg} className="icon icon-check">
-    <path d="M3.5 8.5l3 3 6-7" {...stroke} strokeLinejoin="round" />
+const Icon = ({ d, className = '' }: { d: string; className?: string }) => (
+  <svg {...svg} className={`g ${className}`}>
+    <path d={d} />
   </svg>
 );
-export const Cross = () => (
-  <svg {...svg} className="icon icon-cross">
-    <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" {...stroke} />
-  </svg>
-);
-export const Dash = () => (
-  <svg {...svg} className="icon icon-dash">
-    <path d="M4.5 8h7" {...stroke} />
-  </svg>
-);
-export const Spinner = () => <span className="icon spinner" />;
+
+export const ChevronRight = () => <Icon d="M6 4l4 4-4 4" />;
 export const Play = () => (
-  <svg {...svg} className="icon">
+  <svg {...svg} className="g">
     <path d="M5 3.5v9l7-4.5z" fill="currentColor" />
   </svg>
 );
-export const Pause = () => (
-  <svg {...svg} className="icon">
-    <path d="M5 3.5v9M11 3.5v9" {...stroke} strokeWidth={2.2} />
+export const Pause = () => <Icon d="M5.5 3.5v9M10.5 3.5v9" />;
+export const Bars = () => (
+  <svg {...svg} className="g">
+    <rect x="2" y="2" width="3" height="12" rx="1" />
+    <rect x="6.5" y="2" width="3" height="12" rx="1" />
+    <rect x="11" y="2" width="3" height="12" rx="1" />
   </svg>
 );
-export const ArrowLeft = () => (
-  <svg {...svg} className="icon">
-    <path d="M13 8H3.5M7 3.5L2.5 8 7 12.5" {...stroke} strokeLinejoin="round" />
+export const TasksIcon = () => (
+  <svg {...svg} className="g">
+    <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
+    <path d="M5 6h6M5 8.5h6M5 11h3.5" />
   </svg>
 );
-export const ArrowRight = () => (
-  <svg {...svg} className="icon">
-    <path d="M3 8h9.5M9 3.5L13.5 8 9 12.5" {...stroke} strokeLinejoin="round" />
+export const PersonasIcon = () => (
+  <svg {...svg} className="g">
+    <circle cx="8" cy="5.5" r="2.5" />
+    <path d="M3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4" />
   </svg>
 );
-export const Close = () => (
-  <svg {...svg} className="icon">
-    <path d="M4 4l8 8M12 4l-8 8" {...stroke} />
-  </svg>
+export const SuggestionsIcon = () => (
+  <Icon d="M6 12.5h4M6.5 14.5h3M8 1.8a4.2 4.2 0 0 0-2.5 7.6c.4.3.5.7.5 1.1v.5h4v-.5c0-.4.1-.8.5-1.1A4.2 4.2 0 0 0 8 1.8z" />
 );
+export const Spinner = () => <span className="spin" />;
 
 /** Task progress (run-wide) or an agent's outcome, as one glyph. */
 export function StatusIcon({ status }: { status: TaskStatus | TaskOutcome }) {
   switch (status) {
     case 'done':
+      return (
+        <svg {...svg} className="g g-done">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M5.3 8.2l1.8 1.8 3.6-3.8" />
+        </svg>
+      );
     case 'passed':
       return (
-        <span className="status status-ok">
-          <Check />
-        </span>
+        <svg {...svg} className="g g-passed">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M5.3 8.2l1.8 1.8 3.6-3.8" />
+        </svg>
       );
     case 'failed':
+      return (
+        <svg {...svg} className="g g-failed">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M6 6l4 4M10 6l-4 4" />
+        </svg>
+      );
     case 'errored':
       return (
-        <span className="status status-bad">
-          <Cross />
-        </span>
+        <svg {...svg} className="g g-errored">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M8 5v3.5M8 10.8v.2" />
+        </svg>
       );
     case 'active':
-      return (
-        <span className="status status-active">
-          <Spinner />
-        </span>
-      );
+      return <Spinner />;
     case 'pending':
       return (
-        <span className="status status-pending">
-          <Dash />
-        </span>
+        <svg {...svg} className="g g-pending">
+          <circle cx="8" cy="8" r="6" strokeDasharray="2 2.4" />
+        </svg>
       );
   }
 }

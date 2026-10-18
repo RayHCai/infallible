@@ -1,11 +1,4 @@
-import type { Action } from '@infallible/contracts';
-
-/** Where the agent's eye sits relative to the pump: spherical, radius in pump heights. */
-export interface EyePose {
-  yaw: number;
-  pitch: number;
-  radius: number;
-}
+import type { Action, EyePose } from '@infallible/contracts';
 
 export const INITIAL_POSE: EyePose = { yaw: 0, pitch: 0.12, radius: 1.7 };
 
@@ -13,7 +6,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /** View actions move the eye; everything else leaves it where it is. */
-export function applyAction(pose: EyePose, action: Action): EyePose {
+function applyAction(pose: EyePose, action: Action): EyePose {
   switch (action.kind) {
     case 'rotate_view':
       if (action.axis === 'y') return { ...pose, yaw: pose.yaw + rad(action.deg) };
