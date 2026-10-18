@@ -46,6 +46,9 @@ class FirmwareState(Contract):
     reservoir_units: float
     battery_pct: int
     alarms: list[str]
+    visited: list[str] = Field(
+        default_factory=list, description='Screens shown since reset, in first-visit order.'
+    )
     extra: dict[str, Any] = Field(default_factory=dict)
 
 

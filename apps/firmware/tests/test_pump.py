@@ -95,6 +95,16 @@ def test_holding_a_button_auto_repeats(pump: PumpModel, clock: FakeClock) -> Non
     assert pump.pending_bolus > 0.5  # overshoot is exactly the failure we want to observe
 
 
+def test_state_records_visited_screens(pump: PumpModel) -> None:
+    press(pump, 'ok')
+    press(pump, 'down')
+    press(pump, 'ok')  # menu[Basal] -> basal_view
+    press(pump, 'back')
+    assert pump.state().visited == ['home', 'menu', 'basal_view']
+    pump.reset({})
+    assert pump.state().visited == ['home']
+
+
 def test_reconfigure_disables_confirm(pump: PumpModel) -> None:
     pump.reconfigure({'ui': {'confirm_dialogs': False}})
     press(pump, 'ok')

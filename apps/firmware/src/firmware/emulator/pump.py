@@ -60,6 +60,7 @@ class PumpModel:
     reservoir_units: float = 0.0
     battery_pct: int = 100
     alarms: list[str] = field(default_factory=list)
+    visited: list[str] = field(default_factory=list)
     audio: list[AudioCue] = field(default_factory=list)
     last_input_at: float = 0.0
     _hold: _Hold | None = None
@@ -99,7 +100,9 @@ class PumpModel:
         self._acknowledged.clear()
         after = self.config.faults.false_alarm_after_s
         self._false_alarm_at = None if after is None else now + after
+        self.visited = []
         self._check_alarms()
+        self._visit()
 
     def reconfigure(self, patch: dict[str, Any]) -> None:
         self.config = self.config.patched(patch)
@@ -155,6 +158,7 @@ class PumpModel:
 
         if self.alarms and now >= self._next_alarm_sound:
             self._sound_alarm(now)
+        self._visit()
 
     def state(self) -> FirmwareState:
         return FirmwareState(
@@ -165,6 +169,7 @@ class PumpModel:
             reservoir_units=round(self.reservoir_units, 3),
             battery_pct=self.battery_pct,
             alarms=list(self.alarms),
+            visited=list(self.visited),
             extra={'menu_index': self.menu_index, 'model': self.config.model},
         )
 
@@ -221,6 +226,11 @@ class PumpModel:
             case _:
                 pass
         self.pending_bolus = round(self.pending_bolus, 3)
+        self._visit()
+
+    def _visit(self) -> None:
+        if self.screen.value not in self.visited:
+            self.visited.append(self.screen.value)
 
     def _start_delivery(self) -> None:
         if self.pending_bolus <= 0:
