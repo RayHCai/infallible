@@ -1,13 +1,17 @@
-import type { StartResponse } from '@infallible/contracts';
+import type { RunListing, StartResponse } from '@infallible/contracts';
 
 interface Props {
   start: StartResponse | null;
   onStart: () => void;
   onSkip: () => void;
   busy: boolean;
+  runs?: RunListing[];
+  onOpenRun?: (runId: string) => void;
 }
 
-export function StartView({ start, onStart, onSkip, busy }: Props) {
+const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+export function StartView({ start, onStart, onSkip, busy, runs = [], onOpenRun }: Props) {
   if (!start) {
     return (
       <section className="hero">
@@ -15,6 +19,29 @@ export function StartView({ start, onStart, onSkip, busy }: Props) {
         <button type="button" className="primary" onClick={onStart} disabled={busy}>
           Start
         </button>
+        {runs.length > 0 && (
+          <div className="past">
+            <p className="eyebrow">Previous runs</p>
+            <ul>
+              {runs.map(({ run, created_at, passed, total }) => (
+                <li key={run.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenRun?.(run.id);
+                    }}
+                    disabled={busy}
+                  >
+                    <span>{when.format(new Date(created_at))}</span>
+                    <span className="muted">
+                      {run.state} · {passed}/{total} passed
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
     );
   }

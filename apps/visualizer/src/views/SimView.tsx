@@ -44,6 +44,8 @@ export interface SimProps {
   onTrim: (level: number) => void;
   onOpenAgent: (agentId: string, taskId: string | null) => void;
   onOpenChange: (suggestionId: string) => void;
+  /** Set when showing a saved run; returns to the live driver. */
+  onExit?: () => void;
 }
 
 interface RowProps {
@@ -111,6 +113,7 @@ export function SimView(props: SimProps) {
     onTrim,
     onOpenAgent,
     onOpenChange,
+    onExit,
   } = props;
   const { group, item } = selection;
   const byId = useMemo(() => Object.fromEntries(agents.map((a) => [a.agentId, a])), [agents]);
@@ -170,6 +173,11 @@ export function SimView(props: SimProps) {
           ))}
         </nav>
         <div className="top-r">
+          {onExit && (
+            <button type="button" className="link" onClick={onExit}>
+              Back to live
+            </button>
+          )}
           <span className="state">
             {state === 'evaluating' ? <Spinner /> : <span className={`dot ${state}`} />}
             {state}

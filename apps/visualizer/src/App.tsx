@@ -1,7 +1,9 @@
 import type {
   Agent,
+  DriverMessage,
   MeshAnnotations,
   Persona,
+  RunListing,
   RunState,
   StartResponse,
   Suggestion,
@@ -12,7 +14,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useState }
 import { driver } from './api/driver';
 import { connectDriverSocket } from './api/driverSocket';
 import { DRIVER_URL } from './config';
-import { initialRunView, runReducer } from './state/runStore';
+import { initialRunView, type RunView, runReducer } from './state/runStore';
 import { useSnapshotServer } from './three/useSnapshotServer';
 import { PageSwitch } from './ui/Transition';
 import { BuildingView } from './views/BuildingView';
@@ -24,6 +26,11 @@ import { StartView } from './views/StartView';
 const TERMINAL: RunState[] = ['completed', 'stopped', 'failed'];
 const NOTICE_MS = 4000;
 const HOME: Selection = { group: 'tasks', item: null };
+
+// A saved run is shown by replaying its messages, so the view needs a reset between runs.
+type ViewAction = DriverMessage | { type: 'reset' };
+const viewReducer = (s: RunView, a: ViewAction) =>
+  a.type === 'reset' ? initialRunView : runReducer(s, a);
 
 /** Toast that dismisses itself; remount (key) to show it again. */
 function Notice({ children }: { children: ReactNode }) {
@@ -40,7 +47,7 @@ function Notice({ children }: { children: ReactNode }) {
 }
 
 export function App() {
-  const [view, dispatch] = useReducer(runReducer, initialRunView);
+  const [view, dispatch] = useReducer(viewReducer, initialRunView);
   const [start, setStart] = useState<StartResponse | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [personas, setPersonas] = useState<Map<string, Persona>>(new Map());
@@ -51,8 +58,36 @@ export function App() {
   const [sandbox, setSandbox] = useState<SandboxMode | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // `?run=<id>` opens a saved run directly.
+  const [saved, setSaved] = useState(() => new URLSearchParams(window.location.search).get('run'));
+  const [pastRuns, setPastRuns] = useState<RunListing[]>([]);
 
-  useEffect(() => connectDriverSocket(dispatch), []);
+  useEffect(() => {
+    dispatch({ type: 'reset' });
+    if (!saved) return connectDriverSocket(dispatch);
+    let cancelled = false;
+    driver.replay(saved).then(
+      (messages) => {
+        if (!cancelled) messages.forEach(dispatch);
+      },
+      (err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+        setSaved(null);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [saved]);
+
+  const switchRun = useCallback((id: string | null) => {
+    setSelection(HOME);
+    setSandbox(null);
+    setSuggestions([]);
+    setAgents([]);
+    setAnnotations(null);
+    setSaved(id);
+  }, []);
 
   const runId = view.run?.id ?? null;
   const state = view.run?.state;
@@ -72,10 +107,10 @@ export function App() {
   }, [runId]);
 
   useEffect(() => {
-    if (!runId || state !== 'running') return;
+    if (!runId || !(state === 'running' || saved)) return;
     driver.agents(runId).then(setAgents, () => undefined);
     driver.annotations(runId).then(setAnnotations, () => undefined);
-  }, [runId, state]);
+  }, [runId, state, saved]);
 
   const frameEndpoints = useMemo(
     () =>
@@ -189,6 +224,7 @@ export function App() {
   const agentViews = Object.values(view.agents);
 
   const page = (() => {
+    if (saved) return 'sim';
     if (!runId || !state || TERMINAL.includes(state) || (state === 'prep' && !start)) {
       return state === 'completed' ? 'sim' : 'start';
     }
@@ -197,6 +233,16 @@ export function App() {
     if (state === 'connect') return 'connect';
     return 'sim';
   })();
+
+  useEffect(() => {
+    if (page !== 'start') return;
+    driver.runs().then(
+      (runs) => {
+        setPastRuns(runs.filter((r) => TERMINAL.includes(r.run.state) && r.total > 0));
+      },
+      () => undefined,
+    );
+  }, [page]);
 
   useEffect(() => {
     if (page !== 'sim') return;
@@ -215,7 +261,16 @@ export function App() {
   const body = (() => {
     switch (page) {
       case 'start':
-        return <StartView start={null} busy={busy} onStart={startRun} onSkip={() => undefined} />;
+        return (
+          <StartView
+            start={null}
+            busy={busy}
+            onStart={startRun}
+            onSkip={() => undefined}
+            runs={pastRuns}
+            onOpenRun={switchRun}
+          />
+        );
       case 'qr':
         return (
           <StartView
@@ -254,6 +309,13 @@ export function App() {
             onTrim={trim}
             onOpenAgent={openAgent}
             onOpenChange={openChange}
+            onExit={
+              saved
+                ? () => {
+                    switchRun(null);
+                  }
+                : undefined
+            }
           />
         );
     }
@@ -262,7 +324,7 @@ export function App() {
   return (
     <main>
       {error && <p className="toast">{error}</p>}
-      {state === 'completed' && <Notice key={runId}>Simulation complete</Notice>}
+      {state === 'completed' && !saved && <Notice key={runId}>Simulation complete</Notice>}
       <PageSwitch id={page}>{body}</PageSwitch>
     </main>
   );

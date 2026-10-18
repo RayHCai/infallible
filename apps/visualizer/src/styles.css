@@ -348,6 +348,34 @@ button:disabled {
   letter-spacing: -0.01em;
 }
 
+.past {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 360px;
+  max-height: 40vh;
+  margin-top: 16px;
+}
+
+.past ul {
+  overflow-y: auto;
+  border-top: 1px solid var(--rule);
+}
+
+.past button {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+
+.past button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
 .qr {
   width: 240px;
   height: 240px;
@@ -1031,7 +1059,6 @@ button:disabled {
 .recap:not(.passed) .k {
   color: var(--fail);
 }
-
 
 .transport {
   flex: none;
