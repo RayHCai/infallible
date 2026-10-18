@@ -6,7 +6,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
   "infallible-contracts",
   "aiosqlite>=0.21",
-  "anthropic>=1.0",
+  "anthropic>=1.14.0",
   "fastapi>=0.115",
   "httpx>=0.28",
   "pillow>=11.0",

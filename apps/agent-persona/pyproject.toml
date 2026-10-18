@@ -5,7 +5,7 @@ description = "One simulated pump user: perception, persona modifiers, and the C
 requires-python = ">=3.14,<3.15"
 dependencies = [
   "infallible-contracts",
-  "anthropic>=1.0",
+  "anthropic>=1.14.0",
   "numpy>=2.0",
   "pillow>=11.0",
   "pydantic-settings>=2.7",
