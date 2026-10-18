@@ -70,10 +70,13 @@ class InstancePool:
 
     async def _spawn(self, port: int) -> Instance:
         args = [
-            "-m", "firmware.emulator",
-            "--host", self._s.instance_bind_host,
-            "--port", str(port),
-        ]  # fmt: skip
+            '-m',
+            'firmware.emulator',
+            '--host',
+            self._s.instance_bind_host,
+            '--port',
+            str(port),
+        ]
         if self._s.config_path is not None:
             args += ['--config', str(self._s.config_path)]
         process = await asyncio.create_subprocess_exec(sys.executable, *args)

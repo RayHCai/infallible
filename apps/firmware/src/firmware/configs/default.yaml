@@ -1,16 +1,16 @@
 # Per-instance pump configuration.
 #
 # `buttons` maps firmware button ids -> mesh annotation ids, so `press` actions
-# land on the right 3D region. `ui` holds the knobs that `proposed_change`
+# land on the right 3D region. `ui` and `audio` hold the knobs that `proposed_change`
 # edits can patch for the before/after re-run (via the `configure` op).
 model: generic-pump-v1
 
 buttons:
   up: up
   down: down
-  ok: ok
+  ok: select
   back: back
-  menu: menu
+  home: home
 
 ui:
   screen_width: 240
@@ -23,8 +23,23 @@ ui:
   hold_repeat_after_ms: 600
   hold_repeat_every_ms: 120
 
+audio:
+  volume: 0.6
+  mode: audio
+  keypad_sounds: true
+  high_repeat_s: 10
+  medium_repeat_s: 30
+  escalate_after_s: 600
+
 defaults:
   basal_rate: 0.8
   reservoir_units: 180.0
   battery_pct: 90
   low_reservoir_units: 20.0
+
+# Device failures modelled on common MAUDE problem codes; see FaultConfig.
+faults:
+  stale_bolus_display: true
+  alarm_clear_presses: 2
+  false_alarm_after_s: 60
+  silent_low_reservoir: true

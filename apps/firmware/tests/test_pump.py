@@ -1,13 +1,18 @@
 import asyncio
+import base64
 import contextlib
+import io
+import itertools
 import json
 import socket
+import struct
+import wave
 
 import httpx
 import pytest
 from websockets.asyncio.client import ClientConnection, connect
 
-from firmware.emulator import display
+from firmware.emulator import display, sound
 from firmware.emulator.config import load_config
 from firmware.emulator.display import frame
 from firmware.emulator.pump import PumpModel, Screen
@@ -42,6 +47,10 @@ def press(pump: PumpModel, button: str, times: int = 1) -> None:
         pump.handle(FirmwareInput(event='release', target=button))
 
 
+def cue_ids(pump: PumpModel) -> list[str]:
+    return [c.id for c in pump.drain_audio()]
+
+
 def test_bolus_happy_path(pump: PumpModel, clock: FakeClock) -> None:
     press(pump, 'ok')  # home -> menu
     press(pump, 'ok')  # menu[Bolus] -> entry
@@ -55,6 +64,15 @@ def test_bolus_happy_path(pump: PumpModel, clock: FakeClock) -> None:
         pump.tick()
     assert pump.screen == Screen.HOME
     assert pump.state().bolus_units == pytest.approx(2.5)
+
+
+def test_mesh_ids_map_to_firmware_buttons(pump: PumpModel) -> None:
+    press(pump, 'select')  # mesh id for ok: home -> menu
+    assert pump.screen == Screen.MENU
+    press(pump, 'select')
+    assert pump.screen == Screen.BOLUS_ENTRY
+    press(pump, 'home')
+    assert pump.screen == Screen.HOME
 
 
 def test_menu_timeout_discards_pending_bolus(pump: PumpModel, clock: FakeClock) -> None:
@@ -86,11 +104,121 @@ def test_reconfigure_disables_confirm(pump: PumpModel) -> None:
     assert pump.screen == Screen.DELIVERING
 
 
-def test_low_reservoir_raises_alarm(clock: FakeClock) -> None:
-    pump = PumpModel(config=load_config(), clock=clock)
+def deliver(pump: PumpModel, clock: FakeClock, presses_up: int) -> None:
+    press(pump, 'ok', times=2)  # home -> menu -> bolus entry
+    press(pump, 'up', times=presses_up)
+    press(pump, 'ok', times=2)  # confirm, deliver
+    for _ in range(100):
+        clock.advance(0.1)
+        pump.tick()
+
+
+def test_low_reservoir_raises_alarm(pump: PumpModel) -> None:
     pump.reset({'reservoir_units': 5})
     assert pump.screen == Screen.ALARM
     assert 'low_reservoir' in pump.alarms
+    assert cue_ids(pump) == []  # silent_low_reservoir fault
+
+
+def test_acknowledged_low_reservoir_does_not_realarm_after_bolus(
+    pump: PumpModel, clock: FakeClock
+) -> None:
+    pump.reset({'reservoir_units': 18.0, 'alarms': ['low_reservoir']})
+    press(pump, 'ok', times=2)
+    deliver(pump, clock, presses_up=5)
+    assert pump.reservoir_units == pytest.approx(17.5)
+    assert (pump.screen, pump.alarms) == (Screen.HOME, [])
+
+
+def test_alarm_needs_repeated_ok_to_clear(pump: PumpModel) -> None:
+    pump.reset({'alarms': ['low_reservoir']})
+    press(pump, 'ok')
+    assert pump.screen == Screen.ALARM
+    press(pump, 'ok')
+    assert pump.screen == Screen.HOME
+    assert pump.alarms == []
+
+
+def test_false_occlusion_alarm_fires_once(pump: PumpModel, clock: FakeClock) -> None:
+    assert pump.config.faults.false_alarm_after_s is not None
+    clock.advance(pump.config.faults.false_alarm_after_s)
+    pump.tick()
+    assert pump.screen == Screen.ALARM
+    assert pump.alarms == ['occlusion']
+    assert cue_ids(pump) == ['occlusion']
+    press(pump, 'ok', times=2)
+    clock.advance(1000)
+    pump.tick()
+    assert pump.screen == Screen.HOME
+
+
+def test_home_shows_previous_bolus(pump: PumpModel, clock: FakeClock) -> None:
+    pump.reset({'bolus_units': 1.0})
+    deliver(pump, clock, presses_up=5)
+    assert pump.state().bolus_units == pytest.approx(0.5)
+    assert pump.displayed_bolus_units == pytest.approx(1.0)
+
+
+def test_faults_can_be_disabled(clock: FakeClock) -> None:
+    config = load_config().patched(
+        {
+            'faults': {
+                'stale_bolus_display': False,
+                'alarm_clear_presses': 1,
+                'false_alarm_after_s': None,
+                'silent_low_reservoir': False,
+            }
+        }
+    )
+    pump = PumpModel(config=config, clock=clock)
+    pump.reset({'reservoir_units': 5})
+    assert cue_ids(pump) == ['low_reservoir']
+    press(pump, 'ok')
+    assert pump.screen == Screen.HOME
+    clock.advance(1000)
+    pump.tick()
+    assert pump.alarms == []
+
+
+def test_alarm_is_an_iec_high_priority_burst(pump: PumpModel, clock: FakeClock) -> None:
+    clock.advance(60)
+    pump.tick()
+    [cue] = pump.drain_audio()
+    assert (cue.priority, cue.at_ms) == ('high', 60_000)
+    assert cue.wav_b64 is not None
+    with wave.open(io.BytesIO(base64.b64decode(cue.wav_b64))) as w:
+        samples = struct.unpack(f'<{w.getnframes()}h', w.readframes(w.getnframes()))
+    win = sound.RATE // 100  # 10 ms windows
+    loud = [max(map(abs, samples[i : i + win])) > 500 for i in range(0, len(samples), win)]
+    assert sum(1 for a, b in itertools.pairwise([False, *loud]) if b and not a) == 10
+
+
+def test_unacknowledged_alarm_repeats_then_escalates(pump: PumpModel, clock: FakeClock) -> None:
+    pump.reconfigure({'audio': {'mode': 'vibrate', 'escalate_after_s': 25}})
+    clock.advance(60)
+    pump.tick()
+    first = pump.drain_audio()
+    assert [(c.vibrate, c.wav_b64) for c in first] == [(True, None)]
+    for _ in range(30):
+        clock.advance(1)
+        pump.tick()
+    repeats = pump.drain_audio()
+    assert [c.at_ms for c in repeats] == [70_000, 80_000, 90_000]
+    assert repeats[-1].level_db == sound.MAX_DB  # escalated: full volume despite vibrate mode
+    assert repeats[0].wav_b64 is None
+    press(pump, 'ok', times=2)
+    pump.drain_audio()
+    clock.advance(60)
+    pump.tick()
+    assert pump.drain_audio() == []
+
+
+def test_keypad_sounds_can_be_turned_off(pump: PumpModel) -> None:
+    press(pump, 'ok')
+    assert cue_ids(pump) == ['keypad']
+    pump.reconfigure({'audio': {'keypad_sounds': False}})
+    press(pump, 'back')
+    assert cue_ids(pump) == []
 
 
 def test_frame_renders_png(pump: PumpModel) -> None:
@@ -125,7 +253,7 @@ async def test_viewer_snapshot_keeps_audio_for_agent(clock: FakeClock) -> None:
     assert snap.state.screen == 'menu'
     assert snap.frame is not None
     assert snap.frame.audio == []
-    assert display.frame(server.pump).audio == ['click']
+    assert [c.id for c in display.frame(server.pump).audio] == ['keypad']
 
 
 async def test_gui_and_watch_over_network() -> None:

@@ -1,8 +1,4 @@
-"""Offscreen pump GUI renderer.
-
-Pillow keeps the image small (no SDL/Qt). If richer widgets are needed, swap in
-a pygame/Qt offscreen renderer behind the same ``frame()`` function.
-"""
+"""Offscreen pump GUI renderer; Pillow keeps the image small (no SDL/Qt)."""
 
 import base64
 import io
@@ -36,7 +32,7 @@ def render(pump: PumpModel) -> Image.Image:
     match pump.screen:
         case Screen.HOME:
             row(0, f'Basal {pump.basal_rate:.2f} U/h')
-            row(1, f'Last bolus {pump.bolus_units:.1f} U')
+            row(1, f'Last bolus {pump.displayed_bolus_units:.1f} U')
         case Screen.MENU:
             for i, item in enumerate(MENU_ITEMS):
                 selected = i == pump.menu_index
@@ -46,7 +42,7 @@ def render(pump: PumpModel) -> Image.Image:
             row(1, f'{pump.pending_bolus:.1f} U', fill=_ACCENT)
         case Screen.BOLUS_CONFIRM:
             row(0, f'Deliver {pump.pending_bolus:.1f} U?')
-            row(1, 'OK=yes  BACK=no', big=False)
+            row(1, 'SELECT=yes  BACK=no', big=False)
         case Screen.DELIVERING:
             row(0, 'Delivering...', fill=_ACCENT)
             row(1, f'{pump.delivering_remaining:.2f} U left')

@@ -1,5 +1,5 @@
 from importlib import resources
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,6 +22,21 @@ class UiConfig(BaseModel):
     hold_repeat_every_ms: int = 120
 
 
+class AudioConfig(BaseModel):
+    """The pump's sound settings, as on the device's Sounds menu."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    volume: float = Field(default=0.6, ge=0, le=1)
+    mode: Literal['audio', 'vibrate', 'audio_vibrate'] = 'audio'
+    keypad_sounds: bool = True
+    # Unacknowledged alarms re-sound at these intervals (IEC 60601-1-8 burst intervals).
+    high_repeat_s: float = Field(default=10, gt=0)
+    medium_repeat_s: float = Field(default=30, gt=0)
+    # Still unacknowledged after this: full volume, audible even in vibrate mode; null disables.
+    escalate_after_s: float | None = Field(default=600, gt=0)
+
+
 class PumpDefaults(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -31,13 +46,30 @@ class PumpDefaults(BaseModel):
     low_reservoir_units: float = 20.0
 
 
+class FaultConfig(BaseModel):
+    """Device failures modelled on common MAUDE problem codes."""
+
+    model_config = ConfigDict(extra='forbid')
+
+    # "Device Displays Incorrect Message": Home shows the bolus before the latest one.
+    stale_bolus_display: bool = True
+    # "Visual Prompts will not Clear": OK presses needed to dismiss an alarm.
+    alarm_clear_presses: int = Field(default=2, ge=1)
+    # "False Alarm": one spurious occlusion alarm this long after reset; null disables.
+    false_alarm_after_s: float | None = Field(default=60, gt=0)
+    # "No Audible Alarm": low reservoir alarm shows on screen but never beeps.
+    silent_low_reservoir: bool = True
+
+
 class PumpConfig(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     model: str = 'generic-pump-v1'
     buttons: dict[str, str]
     ui: UiConfig = UiConfig()
+    audio: AudioConfig = AudioConfig()
     defaults: PumpDefaults = PumpDefaults()
+    faults: FaultConfig = FaultConfig()
 
     def patched(self, patch: dict[str, Any]) -> PumpConfig:
         """Deep-merge a partial config (used by proposed_change re-runs)."""
