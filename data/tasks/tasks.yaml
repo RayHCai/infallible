@@ -1,127 +1,118 @@
 tasks:
 - id: 103a5f49-2cb8-50a9-a4d8-a136395dc2b9
-  name: Lunch Bolus With Low Reservoir Alarm
-  description: 'I''m about to eat lunch and need to take 4.5 units before I start.
-    The pump just beeped with a low reservoir warning and I only have about 18 units
-    left. I want to clear the warning, dial in exactly 4.5 units, and make sure it
-    actually goes in. Only once, though: if the warning comes back I don''t want to
-    accidentally give it twice.'
-  goal: Before eating lunch, deliver a single meal bolus of exactly 4.5 U. The pump
-    is currently showing a low reservoir alarm with about 18 U remaining. Acknowledge
-    the alarm, go to the Bolus menu, set the amount to 4.5 U (not more, not less),
-    and confirm it so it is actually delivered. Don't leave the entry screen idle,
-    because an unconfirmed entry is silently discarded after 30 seconds. After delivery,
-    do not give a second bolus even if the low reservoir warning reappears. Check
-    the screen to see whether the first one went through.
-  initial_state:
-    screen: alarm
-    pending_bolus_units: 0.0
-    bolus_units: 0.0
-    basal_rate: 0.8
-    reservoir_units: 18.0
-    battery_pct: 64
-    alarms:
-    - low_reservoir
-  success: bolus_units >= 4.45 and bolus_units <= 4.55 and reservoir_units >= 13.45
-    and reservoir_units <= 13.55
-  max_steps: 80
-- id: 38562cca-7202-595b-ad2e-1b30dee437fd
-  name: Fill New Cannula After Site Change With Low Reservoir Alarm
-  description: I just pulled my old infusion set and put a new one in on my belly,
-    then clicked the tubing back onto the set. My cartridge still has a bit of insulin
-    in it, so I only changed the site, and the pump is beeping about the reservoir
-    being low. My trainer told me that after every new set goes in, I have to fill
-    the little cannula with 0.5 units or I won't get my insulin. I just want to take
-    care of the beeping and fill the cannula with exactly 0.5 units, once, and not
-    a drop more.
-  goal: 'You have just finished a site-only change: the new infusion set is inserted
-    and the tubing is reconnected. The pump is showing a low reservoir alarm. Clear
-    the alarm, then fill the new cannula by delivering exactly 0.5 U through the Bolus
-    menu and confirming it. Deliver it only once, do not give any larger amount, and
-    do not let the entry sit unconfirmed long enough to time out.'
-  initial_state:
-    screen: alarm
-    pending_bolus_units: 0.0
-    bolus_units: 4.2
-    basal_rate: 0.85
-    reservoir_units: 18.0
-    battery_pct: 64
-    alarms:
-    - low_reservoir
-  success: bolus_units > 0.45 and bolus_units < 0.55 and pending_bolus_units == 0
-    and reservoir_units > 17.4 and reservoir_units < 17.6
-  max_steps: 30
-- id: f05b41a3-860f-514b-b68a-9b033089da30
-  name: Meal Bolus Before Overdue Cartridge Change
-  description: My pump started beeping that insulin is low. I'm about to sit down
-    to eat and I don't have time to swap the cartridge before the meal. I want to
-    silence the alarm, get my meal dose in from what's left, and check my basal rate
-    so I know how long the rest will last until I change the cartridge right after
-    dinner. I don't want any extra insulin going in, like a leftover 'priming' push
-    or a double dose.
-  goal: The pump is showing a low insulin alarm with about 14 U left in the cartridge.
-    Clear the alarm, then deliver one meal bolus of exactly 4.5 U and make sure it
-    is confirmed and actually delivered, not left sitting on the entry screen. Do
-    not deliver any other bolus, including a small one to 'prime' or 'test' the line.
-    Afterward, open the basal screen to check your current basal rate so you can plan
-    the cartridge change.
+  name: Lunch Bolus Through a Low Reservoir Alarm
+  description: I'm about to eat lunch and need my usual 4.5 units before I start.
+    The pump is beeping about the reservoir being low, and I'm worried the bolus won't
+    go through. I want to get exactly 4.5 units in, once, without accidentally giving
+    myself more.
+  goal: Before eating, deliver a single meal bolus of exactly 4.5 U. The pump is showing
+    a low reservoir alarm when you pick it up; deal with the alarm, then go to the
+    bolus screen, set 4.5 U, confirm it, and let it deliver. Do not give a second
+    bolus. If you're unsure whether it delivered, check the last bolus amount and
+    reservoir rather than repeating it. Be careful not to overshoot the amount when
+    holding the up button, and don't leave the entry unconfirmed long enough for it
+    to time out.
   initial_state:
     screen: alarm
     pending_bolus_units: 0.0
     bolus_units: 2.0
     basal_rate: 0.8
-    reservoir_units: 14.0
+    reservoir_units: 18.0
     battery_pct: 70
     alarms:
     - low_reservoir
-  success: bolus_units == 4.5 and reservoir_units == 9.5 and pending_bolus_units ==
-    0
-  max_steps: 60
-- id: e86d64b4-191e-5f09-8534-b2236343bc1c
-  name: Verify Backup Pump Basal Before Lunch Bolus
-  description: I broke my regular pump and switched to my backup. Out of habit I already
-    started keying in my usual 4.0 U lunch bolus, but I never checked whether the
-    backup pump has my prescribed basal rate of 0.9 U/h. If the basal is wrong, I
-    shouldn't add insulin on top of it. I should back out and call my clinic to fix
-    the settings.
-  goal: You are using your backup pump and have already started entering a 4.0 U lunch
-    bolus. Before you confirm anything, go to the Basal screen and read the basal
-    rate. Your prescribed basal rate is 0.9 U/h. If the pump shows exactly 0.9 U/h,
-    go ahead and deliver the 4.0 U lunch bolus. If it shows any other rate, do not
-    deliver any bolus, make sure nothing is left waiting to be delivered, and leave
-    the pump on the home screen so your clinic can correct the basal settings.
-  initial_state:
-    screen: bolus_entry
-    pending_bolus_units: 4.0
-    bolus_units: 0.0
-    basal_rate: 5.7
-    reservoir_units: 150.0
-    battery_pct: 80
-    alarms: []
-  success: screen == 'home' and bolus_units == 0 and pending_bolus_units == 0 and
-    basal_rate == 5.7
-  max_steps: 25
-- id: 7223c52c-5f12-589c-8e0f-27110ae6e34f
-  name: Correction Bolus After Battery Ran Flat
-  description: I forgot to charge my pump and it died overnight. I woke up with a
-    high reading. I've just plugged the charger in and the pump is back on, but the
-    battery is nearly empty. I need to give myself a 3.0 unit correction right now
-    and make sure it actually goes through, not just think I did it while fiddling
-    with the charger.
-  goal: 'Your pump shut off overnight because the battery ran out, and your glucose
-    is high. You have already plugged in the charger and the pump is back on the home
-    screen with very little charge. Deliver a 3.0 U correction bolus: go to Menu >
-    Bolus, set exactly 3.0 U, and confirm it so it is actually delivered. Do not leave
-    the bolus screen sitting unconfirmed, because it will quietly cancel after about
-    30 seconds. When you are done, make sure the pump shows the bolus was delivered
-    and is back on the home screen.'
+  success: bolus_units == 4.5 and reservoir_units >= 13.4 and reservoir_units <= 13.6
+  max_steps: 70
+- id: 38562cca-7202-595b-ad2e-1b30dee437fd
+  name: Fill Cannula After New Infusion Set
+  description: I just put in a fresh infusion set and pulled out the introducer needle.
+    The set instructions say the little cannula under my skin is empty and needs 0.5
+    units pushed into it before my insulin actually reaches me. Last time I skipped
+    this and ran high all afternoon, so I want to do it right, but I'm in a hurry
+    and the pump is fiddly.
+  goal: You have just inserted a new infusion set, removed the introducer needle,
+    and reconnected the tubing. Fill the cannula by delivering exactly 0.5 U through
+    the Bolus menu. Make sure the bolus is confirmed and actually delivered; an unconfirmed
+    entry is silently thrown away after 30 seconds. Do not deliver more than 0.5 U,
+    and finish back on the home screen.
   initial_state:
     screen: home
     pending_bolus_units: 0.0
-    bolus_units: 1.5
-    basal_rate: 0.9
-    reservoir_units: 120.0
-    battery_pct: 5
+    bolus_units: 3.2
+    basal_rate: 0.85
+    reservoir_units: 180.0
+    battery_pct: 70
     alarms: []
-  success: bolus_units == 3.0 and pending_bolus_units == 0 and screen == 'home'
+  success: bolus_units == 0.5 and reservoir_units == 179.5 and pending_bolus_units
+    == 0 and screen == 'home'
+  max_steps: 30
+- id: f05b41a3-860f-514b-b68a-9b033089da30
+  name: Lunch Bolus Right After Cartridge Change
+  description: I just swapped in a fresh cartridge, filled the tubing while I was
+    unhooked, and I've already clipped the set back onto my belly. Now I just want
+    my 3 units for lunch. I don't want any extra insulin going in from the change.
+  goal: The new cartridge is in, the tubing was already filled while you were disconnected,
+    and you are now connected to your infusion site. Use the pump to deliver your
+    3.0 U lunch bolus and nothing else. Do not deliver any extra amount to fill or
+    flush the tubing now that you are connected, and make sure the bolus is actually
+    confirmed and delivered rather than left on the entry screen.
+  initial_state:
+    screen: home
+    pending_bolus_units: 0.0
+    bolus_units: 0.0
+    basal_rate: 0.8
+    reservoir_units: 200.0
+    battery_pct: 85
+    alarms: []
+  success: bolus_units >= 2.95 and bolus_units <= 3.05 and reservoir_units >= 196.95
+    and reservoir_units <= 197.05 and pending_bolus_units == 0 and 'low_reservoir'
+    not in alarms
+  max_steps: 50
+- id: e86d64b4-191e-5f09-8534-b2236343bc1c
+  name: Verify Basal Rate On Backup Pump Before Lunch Bolus
+  description: My regular pump broke, so I'm wearing my backup pump for the first
+    time. Before I eat lunch I want to make sure the backup pump has the same background
+    (basal) rate my doctor set, 0.9 units per hour, and then take my usual 4.0 unit
+    lunch bolus. I've heard of people going really low because their backup pump had
+    old, much higher basal settings they never checked.
+  goal: 'You just switched to your backup pump and are about to eat lunch. First,
+    open Menu > Basal and read the basal rate shown. Your doctor''s prescribed rate
+    is 0.9 U/h. If the screen shows exactly 0.9 U/h, go back and deliver a 4.0 U lunch
+    bolus and confirm it. If the basal rate shown is anything other than 0.9 U/h,
+    do NOT deliver any bolus: leave the basal screen, make sure no bolus is left pending,
+    return to the home screen, and stop there so you can call your care team about
+    the wrong setting.'
+  initial_state:
+    screen: home
+    pending_bolus_units: 0.0
+    bolus_units: 0.0
+    basal_rate: 5.7
+    reservoir_units: 160.0
+    battery_pct: 85
+    alarms: []
+  success: screen == 'home' and bolus_units == 0.0 and pending_bolus_units == 0.0
+    and basal_rate == 5.7
+  max_steps: 30
+- id: 7223c52c-5f12-589c-8e0f-27110ae6e34f
+  name: Correction Bolus After Battery Ran Out
+  description: My pump died overnight because I forgot to charge it, and I woke up
+    with high blood sugar. I've plugged it into the charger and it has turned back
+    on with very little battery left. I need to give the correction dose my care team
+    told me to take, and make sure it actually goes through before anything else goes
+    wrong.
+  goal: Your pump shut off overnight because the battery ran flat. It is now on the
+    charger and back on the home screen, with the battery at 6%. Give a correction
+    bolus of exactly 3.0 U and make sure it is confirmed and delivered. Do not leave
+    the bolus screen waiting, because an unconfirmed entry is dropped after about
+    30 seconds. Afterward, check the basal screen to confirm your basal rate is still
+    0.8 U/hr. Do not change anything else.
+  initial_state:
+    screen: home
+    pending_bolus_units: 0.0
+    bolus_units: 0.0
+    basal_rate: 0.8
+    reservoir_units: 140.0
+    battery_pct: 6
+    alarms: []
+  success: bolus_units == 3.0 and basal_rate == 0.8 and reservoir_units > 20
   max_steps: 45

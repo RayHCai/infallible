@@ -175,7 +175,7 @@ def extract(limit: int | None) -> None:
 FIRMWARE = """\
 The simulated pump is generic-pump-v1: buttons up, down, ok, back, menu; screens
 home, menu (Bolus / Basal / Back), bolus_entry (up/down by 0.1 U, max 25),
-bolus_confirm, delivering, basal_view (read-only), alarm (ok clears). Unconfirmed
+bolus_confirm, delivering, basal_view (read-only), alarm (ok twice clears). Unconfirmed
 bolus entry times out to home after 30 s and is silently discarded. Holding a
 button auto-repeats after 600 ms. A low_reservoir alarm fires at <= 20 U.
 Firmware state (for initial_state and success): screen, bolus_units (last
@@ -209,9 +209,17 @@ class TaskDraft(BaseModel):
     max_steps: int = Field(ge=5, le=100)
 
 
+class ModifierParams(BaseModel):
+    sigma: float | None
+    factor: float | None
+    kind: Literal['protanopia', 'deuteranopia', 'tritanopia'] | None
+    amplitude: float | None
+    severity: float | None
+
+
 class ModifierDraft(BaseModel):
     id: ModifierId
-    parameters: dict[str, float | str]
+    parameters: ModifierParams = Field(description="Set only the modifier's own parameter.")
 
 
 class PersonaDraft(BaseModel):
@@ -226,6 +234,8 @@ class PersonaDraft(BaseModel):
     )
     modifiers: list[ModifierDraft]
 
+
+VISION = {ModifierId.BLUR, ModifierId.CONTRAST_LOSS, ModifierId.COLOR_DEFICIENCY}
 
 # Baseline: separates design failures (everyone fails) from persona-specific ones.
 CONTROL = Persona.model_validate(
@@ -332,7 +342,23 @@ def build() -> None:
             continue
         factor = r['factors'][0] if r['factors'] else 'none_stated'
         by_profile[(age_bracket(int(m.group(1))), r['operator'], factor)].append(r)
-    top_profiles = sorted(by_profile, key=lambda p: -len(by_profile[p]))[:N_PERSONAS]
+    # Impairments are rarely stated, so they never rank: add a tremor profile from any
+    # adult that names one, and require vision modifiers for the older adult.
+    tremor = ('adult', 'self', Factor.DEXTERITY.value)
+    by_profile[tremor] = [
+        r
+        for (bracket, *_), group in by_profile.items()
+        if bracket in ('adult', 'older adult')
+        for r in group
+        if Factor.DEXTERITY in r['factors']
+    ]
+    top_profiles = [
+        *[p for p in sorted(by_profile, key=lambda p: -len(by_profile[p])) if p != tremor][
+            : N_PERSONAS - 1
+        ],
+        tremor,
+    ]
+    required = {tremor: {ModifierId.TREMOR}, ('older adult', 'self', 'none_stated'): VISION}
 
     personas = [CONTROL]
     for profile in top_profiles:
@@ -343,6 +369,10 @@ def build() -> None:
         tasks_seen = Counter(r['task'] for r in group).most_common(5)
         sample = rng.sample(group, min(N_SAMPLES, len(group)))
         bracket, operator, factor = profile
+        need = required.get(profile, set())
+        if VISION & need:
+            vision = [r for g in by_profile.values() for r in g if Factor.VISION in r['factors']]
+            sample += rng.sample(vision, min(N_SAMPLES // 2, len(vision)))
         persona_draft = synth(
             client,
             f'Write one persona for usability-testing an insulin pump. Do not give the person '
@@ -357,11 +387,15 @@ def build() -> None:
             f'({", ".join(ModifierId)}); add one only if the profile supports it, with numeric '
             'parameters (blur: sigma ~1-4; contrast_loss: factor 0-1; color_deficiency: kind; '
             'tremor: amplitude 0-1, chance a press slips; hearing_loss, neuropathy: severity '
-            '0-1). The guiding_prompt should make the agent act as this person '
+            '0-1). '
+            + (f'This persona MUST have at least one of: {", ".join(need)}. ' if need else '')
+            + 'The guiding_prompt should make the agent act as this person '
             'would, including their typical mistakes, not as an expert.\n\nSample narratives:\n'
             + '\n\n'.join(narrative(r) for r in sample),
             PersonaDraft,
         )
+        if need and not need & {m.id for m in persona_draft.modifiers}:
+            raise RuntimeError(f'persona {profile} is missing a modifier from {need}')
         personas.append(
             Persona.model_validate(
                 {
@@ -372,7 +406,10 @@ def build() -> None:
                         'age': persona_draft.age,
                         'gender': persona_draft.gender,
                         'guiding_prompt': persona_draft.guiding_prompt,
-                        'modifiers': [m.model_dump(mode='json') for m in persona_draft.modifiers],
+                        'modifiers': [
+                            {'id': m.id, 'parameters': m.parameters.model_dump(exclude_none=True)}
+                            for m in persona_draft.modifiers
+                        ],
                     },
                 }
             )
