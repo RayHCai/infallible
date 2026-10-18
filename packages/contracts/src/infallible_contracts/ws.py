@@ -43,6 +43,14 @@ class TaskScoredMessage(Contract):
     reason: str | None = Field(default=None, description='Why the task failed or errored.')
 
 
+class TaskSummaryMessage(Contract):
+    type: Literal['task_summary'] = 'task_summary'
+    run_id: UUID
+    agent_id: UUID
+    task_id: UUID
+    summary: str = Field(description='Short plain-language recap of what the agent did.')
+
+
 class SuggestionsReadyMessage(Contract):
     type: Literal['suggestions_ready'] = 'suggestions_ready'
     run_id: UUID
@@ -55,6 +63,7 @@ DriverMessage = Annotated[
     | BuildDoneMessage
     | AgentEventMessage
     | TaskScoredMessage
+    | TaskSummaryMessage
     | SuggestionsReadyMessage,
     Field(discriminator='type'),
 ]

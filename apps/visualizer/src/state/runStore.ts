@@ -25,6 +25,8 @@ export interface AgentView {
   outcomes: Record<string, TaskOutcome>;
   /** Driver's explanation for failed/errored tasks. */
   reasons: Record<string, string>;
+  /** Claude's recap of each finished task; arrives shortly after scoring. */
+  summaries: Record<string, string>;
 }
 
 export interface RunView {
@@ -55,6 +57,7 @@ const newAgent = (agentId: string): AgentView => ({
   history: {},
   outcomes: {},
   reasons: {},
+  summaries: {},
 });
 
 function patchAgent(state: RunView, agentId: string, patch: (a: AgentView) => Partial<AgentView>) {
@@ -87,6 +90,10 @@ export function runReducer(state: RunView, message: DriverMessage): RunView {
         errored: a.errored + (message.outcome === 'errored' ? 1 : 0),
         outcomes: { ...a.outcomes, [message.task_id]: message.outcome },
         reasons: message.reason ? { ...a.reasons, [message.task_id]: message.reason } : a.reasons,
+      }));
+    case 'task_summary':
+      return patchAgent(state, message.agent_id, (a) => ({
+        summaries: { ...a.summaries, [message.task_id]: message.summary },
       }));
     case 'suggestions_ready':
       return { ...state, suggestionsCount: message.count };

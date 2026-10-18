@@ -46,6 +46,7 @@ describe('runReducer', () => {
         outcome: 'failed',
         reason: 'nope',
       },
+      { type: 'task_summary', run_id: RUN, agent_id: AGENT, task_id: TASK, summary: 'tried up' },
     );
     expect(state.agents[AGENT]).toMatchObject({
       frameEndpoint: 'h:1',
@@ -54,6 +55,7 @@ describe('runReducer', () => {
       status: 'idle',
       outcomes: { [TASK]: 'failed' },
       reasons: { [TASK]: 'nope' },
+      summaries: { [TASK]: 'tried up' },
     });
     expect(state.agents[AGENT]?.history[TASK]).toEqual([
       { step: 0, chosen: { kind: 'press', button_id: 'up' }, reasoning: 'up', at },

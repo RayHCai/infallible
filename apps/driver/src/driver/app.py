@@ -21,6 +21,7 @@ from driver.pipeline.run_manager import (
     RunManager,
     RunNotFoundError,
 )
+from driver.pipeline.summarizer import Summarizer
 from driver.services.broadcaster import Broadcaster
 from driver.services.firmware_host import FirmwareHostClient
 from driver.services.launcher import AgentLauncher, SubprocessLauncher
@@ -65,6 +66,7 @@ def create_app(
         r = redis or Redis.from_url(settings.redis_url)
         broadcaster = Broadcaster()
         firmware = FirmwareHostClient(settings.firmware_mode, settings.firmware_host_url)
+        claude = anthropic or AsyncAnthropic()
         runs = RunManager(
             settings=settings,
             db=db,
@@ -74,11 +76,12 @@ def create_app(
             firmware=firmware,
             launcher=launcher or SubprocessLauncher(),
             evaluator=Evaluator(
-                anthropic or AsyncAnthropic(),
+                claude,
                 settings.evaluator_model,
                 settings.evaluator_effort,
                 settings.evaluator_max_tokens,
             ),
+            summarizer=Summarizer(claude, settings.summarizer_model),
         )
         app.state.services = Services(settings, db, r, broadcaster, firmware, runs)
         try:

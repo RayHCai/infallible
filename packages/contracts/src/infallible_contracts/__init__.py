@@ -81,6 +81,7 @@ from infallible_contracts.ws import (
     RunStateMessage,
     SuggestionsReadyMessage,
     TaskScoredMessage,
+    TaskSummaryMessage,
 )
 
 __all__ = [
@@ -146,6 +147,7 @@ __all__ = [
     'TaskResult',
     'TaskScoredMessage',
     'TaskStarted',
+    'TaskSummaryMessage',
     'TurnAction',
     'WaitAction',
     'ZoomAction',

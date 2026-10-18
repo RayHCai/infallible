@@ -42,6 +42,7 @@ class DriverSettings(BaseSettings):
     evaluator_model: str = 'claude-opus-5-5'
     evaluator_effort: Effort = 'high'
     evaluator_max_tokens: int = 16000
+    summarizer_model: str = 'claude-haiku-4-5'
 
     log_level: str = 'INFO'
 

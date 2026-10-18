@@ -42,6 +42,7 @@ from infallible_contracts import (
     TaskOutcome,
     TaskResult,
     TaskScoredMessage,
+    TaskSummaryMessage,
 )
 from infallible_contracts.loaders import load_personas, load_tasks
 from infallible_contracts.paths import DataLayout
@@ -63,10 +64,12 @@ if TYPE_CHECKING:
     from driver.db.database import Database
     from driver.object_builder import Capture, ObjectBuilder
     from driver.pipeline.evaluator import Evaluator
+    from driver.pipeline.summarizer import Summarizer
     from driver.services.broadcaster import Broadcaster
     from driver.services.firmware_host import FirmwareHostClient
     from driver.services.launcher import AgentLauncher
     from driver.settings import DriverSettings
+    from infallible_contracts import Persona
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +96,11 @@ class ActiveRun:
     next_task: dict[UUID, int] = field(default_factory=dict)
     finished: set[UUID] = field(default_factory=set)
     errored: dict[tuple[UUID, UUID], str] = field(default_factory=dict)
+    persona_of: dict[UUID, Persona] = field(default_factory=dict)
+    actions: dict[tuple[UUID, UUID], list[ActionEvent]] = field(default_factory=dict)
     background: set[asyncio.Task[None]] = field(default_factory=set)
+    # Kept apart from `background`: a failed summary must not fail the run.
+    summaries: set[asyncio.Task[None]] = field(default_factory=set)
 
     @property
     def all_done(self) -> bool:
@@ -114,6 +121,7 @@ class RunManager:
         firmware: FirmwareHostClient,
         launcher: AgentLauncher,
         evaluator: Evaluator,
+        summarizer: Summarizer,
     ) -> None:
         self.s = settings
         self.layout = DataLayout(settings.data_dir)
@@ -124,6 +132,7 @@ class RunManager:
         self.firmware = firmware
         self.launcher = launcher
         self.evaluator = evaluator
+        self.summarizer = summarizer
         self._active: ActiveRun | None = None
         self._lock = asyncio.Lock()
 
@@ -174,6 +183,8 @@ class RunManager:
             for i, endpoint in enumerate(endpoints)
         ]
         await self.db.insert_agents(active.agents)
+        by_id = {p.id: p for p in personas}
+        active.persona_of = {a.id: by_id[a.persona_id] for a in active.agents}
 
         # Consumer groups must exist before dispatch so no task is missed.
         await self._ensure_group(events_stream(run_id), DRIVER_CONSUMER_GROUP)
@@ -253,6 +264,7 @@ class RunManager:
         await self.broadcaster.publish(AgentEventMessage(event=event))
         match event:
             case ActionEvent():
+                active.actions.setdefault((event.agent_id, event.task_id), []).append(event)
                 await self.db.insert_interaction(
                     Interaction(
                         id=uuid4(),
@@ -307,6 +319,33 @@ class RunManager:
                 reason=reason,
             )
         )
+        job = asyncio.create_task(self._summarize(active, done, outcome, reason))
+        active.summaries.add(job)
+        job.add_done_callback(active.summaries.discard)
+
+    async def _summarize(
+        self, active: ActiveRun, done: TaskDone, outcome: TaskOutcome, reason: str | None
+    ) -> None:
+        try:
+            summary = await self.summarizer.summarize(
+                persona=active.persona_of.get(done.agent_id),
+                task=active.task(done.task_id),
+                actions=active.actions.pop((done.agent_id, done.task_id), []),
+                outcome=outcome,
+                reason=reason,
+            )
+        except Exception:  # best-effort, like the evaluator
+            log.exception('summarizer call failed for %s/%s', done.agent_id, done.task_id)
+            return
+        if summary:
+            await self.broadcaster.publish(
+                TaskSummaryMessage(
+                    run_id=active.run.id,
+                    agent_id=done.agent_id,
+                    task_id=done.task_id,
+                    summary=summary,
+                )
+            )
 
     async def _dispatch_next(self, active: ActiveRun, agent_id: UUID) -> None:
         """Tasks go out one at a time per agent; agents are not in lockstep."""
@@ -374,6 +413,7 @@ class RunManager:
         await self.broadcaster.publish(
             SuggestionsReadyMessage(run_id=run_id, count=len(suggestions.suggestions))
         )
+        await asyncio.gather(*active.summaries)
         await self._teardown(active, RunState.COMPLETED)
 
     # ------------------------------------------------------------------ #
@@ -417,7 +457,7 @@ class RunManager:
 
     async def _teardown(self, active: ActiveRun, state: RunState) -> None:
         current = asyncio.current_task()
-        for task in list(active.background):
+        for task in [*active.background, *active.summaries]:
             if task is not current:
                 task.cancel()
         await self.launcher.stop_all()

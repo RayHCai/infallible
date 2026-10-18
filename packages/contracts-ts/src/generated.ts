@@ -29,6 +29,7 @@ export type DriverMessage =
   | BuildDoneMessage
   | AgentEventMessage
   | TaskScoredMessage
+  | TaskSummaryMessage
   | SuggestionsReadyMessage;
 /**
  * This interface was referenced by `InfallibleContracts`'s JSON-Schema
@@ -53,7 +54,13 @@ export type TaskOutcome = 'passed' | 'failed' | 'errored';
  * via the `definition` "ModifierId".
  */
 export type ModifierId =
-  'blur' | 'contrast_loss' | 'color_deficiency' | 'tremor' | 'hearing_loss' | 'neuropathy';
+  | 'blur'
+  | 'contrast_loss'
+  | 'color_deficiency'
+  | 'tremor'
+  | 'hearing_loss'
+  | 'neuropathy'
+  | 'rushing';
 /**
  * This interface was referenced by `InfallibleContracts`'s JSON-Schema
  * via the `definition` "SuggestionCategory".
@@ -352,6 +359,20 @@ export interface TaskScoredMessage {
    * Why the task failed or errored.
    */
   reason: string | null;
+}
+/**
+ * This interface was referenced by `InfallibleContracts`'s JSON-Schema
+ * via the `definition` "TaskSummaryMessage".
+ */
+export interface TaskSummaryMessage {
+  type: 'task_summary';
+  run_id: string;
+  agent_id: string;
+  task_id: string;
+  /**
+   * Short plain-language recap of what the agent did.
+   */
+  summary: string;
 }
 /**
  * This interface was referenced by `InfallibleContracts`'s JSON-Schema

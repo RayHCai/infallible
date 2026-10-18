@@ -456,7 +456,9 @@ function TaskDetail({
           <blockquote className="quote">{task.description}</blockquote>
           <dl className="facts">
             <dt>Goal</dt>
-            <dd>{task.goal}</dd>
+            <dd className="clamp" title={task.goal}>
+              {task.goal}
+            </dd>
             <dt>Success</dt>
             <dd>
               <code>{task.success}</code>

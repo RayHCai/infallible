@@ -739,7 +739,8 @@
           "build_progress": "#/$defs/BuildProgressMessage",
           "run_state": "#/$defs/RunStateMessage",
           "suggestions_ready": "#/$defs/SuggestionsReadyMessage",
-          "task_scored": "#/$defs/TaskScoredMessage"
+          "task_scored": "#/$defs/TaskScoredMessage",
+          "task_summary": "#/$defs/TaskSummaryMessage"
         },
         "propertyName": "type"
       },
@@ -758,6 +759,9 @@
         },
         {
           "$ref": "#/$defs/TaskScoredMessage"
+        },
+        {
+          "$ref": "#/$defs/TaskSummaryMessage"
         },
         {
           "$ref": "#/$defs/SuggestionsReadyMessage"
@@ -907,7 +911,8 @@
         "color_deficiency",
         "tremor",
         "hearing_loss",
-        "neuropathy"
+        "neuropathy",
+        "rushing"
       ],
       "title": "ModifierId",
       "type": "string"
@@ -1566,6 +1571,46 @@
         "task_id"
       ],
       "title": "TaskStarted",
+      "type": "object"
+    },
+    "TaskSummaryMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "task_summary",
+          "default": "task_summary",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "format": "uuid",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "agent_id": {
+          "format": "uuid",
+          "title": "Agent Id",
+          "type": "string"
+        },
+        "task_id": {
+          "format": "uuid",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "summary": {
+          "description": "Short plain-language recap of what the agent did.",
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "agent_id",
+        "task_id",
+        "summary"
+      ],
+      "title": "TaskSummaryMessage",
       "type": "object"
     },
     "TurnAction": {

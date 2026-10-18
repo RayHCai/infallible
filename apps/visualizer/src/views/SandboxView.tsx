@@ -1,4 +1,10 @@
-import type { MeshAnnotations, Persona, Suggestion, Task } from '@infallible/contracts';
+import type {
+  MeshAnnotations,
+  Persona,
+  Suggestion,
+  Task,
+  TaskOutcome,
+} from '@infallible/contracts';
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ActionRecord, AgentView } from '../state/runStore';
@@ -129,6 +135,48 @@ function useChange(
     [suggestion],
   );
   return { after, setAfter };
+}
+
+const OUTCOME_LABEL: Record<TaskOutcome, string> = {
+  passed: 'Passed',
+  failed: 'Failed',
+  errored: 'Errored',
+};
+
+function duration(actions: ActionRecord[]): string | null {
+  const first = actions[0];
+  const last = actions[actions.length - 1];
+  if (!first || !last) return null;
+  const s = Math.round((Date.parse(last.at) - Date.parse(first.at)) / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function Recap({
+  outcome,
+  actions,
+  summary,
+  reason,
+}: {
+  outcome: TaskOutcome;
+  actions: ActionRecord[];
+  summary: string | undefined;
+  reason: string | null;
+}) {
+  const took = duration(actions);
+  return (
+    <div className={`recap ${outcome}`}>
+      <div className="recap-head">
+        <StatusIcon status={outcome} />
+        <span className="k">{OUTCOME_LABEL[outcome]}</span>
+        <span className="muted">
+          {actions.length} {actions.length === 1 ? 'step' : 'steps'}
+          {took && ` · ${took}`}
+        </span>
+      </div>
+      {summary ? <p>{summary}</p> : <p className="muted">Summarizing…</p>}
+      {reason && <p className="muted">{reason}</p>}
+    </div>
+  );
 }
 
 /** Column 4 of the browser: the 3D scene plus what the agent is doing in it. */
@@ -291,6 +339,14 @@ export function SandboxView(props: Props) {
           </div>
 
           <div className="sb-body">
+            {outcome && (
+              <Recap
+                outcome={outcome}
+                actions={actions}
+                summary={taskId ? agent?.summaries[taskId] : undefined}
+                reason={failure}
+              />
+            )}
             <div className={`step ${mode.kind === 'live' && agent?.frameEndpoint ? 'live' : ''}`}>
               <div>
                 <span className="eyebrow">
@@ -306,12 +362,6 @@ export function SandboxView(props: Props) {
               </div>
               {mode.kind === 'live' && <LiveFrame endpoint={agent?.frameEndpoint ?? null} />}
             </div>
-            {failure && (
-              <div className="failure">
-                <span className="k">{outcome === 'errored' ? 'Errored' : 'Failed'}</span>
-                <p>{failure}</p>
-              </div>
-            )}
           </div>
 
           {mode.kind === 'replay' && (
