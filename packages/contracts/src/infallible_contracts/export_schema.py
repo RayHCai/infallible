@@ -28,6 +28,7 @@ from infallible_contracts import (
     RenderReply,
     RenderRequest,
     Run,
+    RunListing,
     StartResponse,
     StopRequest,
     SuggestionsFile,
@@ -37,6 +38,7 @@ from infallible_contracts import (
 # Root-level names that become exported TS types.
 _MODELS: dict[str, type[BaseModel]] = {
     'QrPayload': QrPayload,
+    'RunListing': RunListing,
     'StartResponse': StartResponse,
     'StopRequest': StopRequest,
     'BuildAccepted': BuildAccepted,

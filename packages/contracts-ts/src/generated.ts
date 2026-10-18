@@ -96,6 +96,7 @@ export interface InfallibleContracts {
   RenderReply: RenderReply;
   RenderRequest: RenderRequest;
   Run: Run;
+  RunListing: RunListing;
   StartResponse: StartResponse;
   StopRequest: StopRequest;
   SuggestionsFile: SuggestionsFile;
@@ -514,6 +515,21 @@ export interface EyePose {
   yaw: number;
   pitch: number;
   radius: number;
+}
+/**
+ * A saved run, for the visualizer's previous-runs list.
+ *
+ * This interface was referenced by `InfallibleContracts`'s JSON-Schema
+ * via the `definition` "RunListing".
+ */
+export interface RunListing {
+  run: Run;
+  created_at: string;
+  passed: number;
+  /**
+   * Scored (agent, task) pairs.
+   */
+  total: number;
 }
 /**
  * This interface was referenced by `InfallibleContracts`'s JSON-Schema

@@ -1,11 +1,12 @@
 """Driver HTTP API request/response bodies."""
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import Field
 
 from infallible_contracts._base import Contract
-from infallible_contracts.run import RunState
+from infallible_contracts.run import Run, RunState
 
 
 class QrPayload(Contract):
@@ -20,6 +21,15 @@ class StartResponse(Contract):
     state: RunState
     qr: QrPayload
     qr_png_b64: str
+
+
+class RunListing(Contract):
+    """A saved run, for the visualizer's previous-runs list."""
+
+    run: Run
+    created_at: datetime
+    passed: int
+    total: int = Field(description='Scored (agent, task) pairs.')
 
 
 class StopRequest(Contract):

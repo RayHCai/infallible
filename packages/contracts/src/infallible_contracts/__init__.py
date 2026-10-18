@@ -23,6 +23,7 @@ from infallible_contracts.api import (
     ConnectResponse,
     Device,
     QrPayload,
+    RunListing,
     StartResponse,
     StopRequest,
 )
@@ -131,6 +132,7 @@ __all__ = [
     'RenderRequest',
     'RotateViewAction',
     'Run',
+    'RunListing',
     'RunState',
     'RunStateMessage',
     'StartResponse',

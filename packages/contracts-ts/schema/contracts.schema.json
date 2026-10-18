@@ -45,6 +45,9 @@
     "Run": {
       "$ref": "#/$defs/Run"
     },
+    "RunListing": {
+      "$ref": "#/$defs/RunListing"
+    },
     "StartResponse": {
       "$ref": "#/$defs/StartResponse"
     },
@@ -73,6 +76,7 @@
     "RenderReply",
     "RenderRequest",
     "Run",
+    "RunListing",
     "StartResponse",
     "StopRequest",
     "SuggestionsFile",
@@ -1188,6 +1192,37 @@
         "current_task_index"
       ],
       "title": "Run",
+      "type": "object"
+    },
+    "RunListing": {
+      "additionalProperties": false,
+      "description": "A saved run, for the visualizer's previous-runs list.",
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/Run"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "integer"
+        },
+        "total": {
+          "description": "Scored (agent, task) pairs.",
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run",
+        "created_at",
+        "passed",
+        "total"
+      ],
+      "title": "RunListing",
       "type": "object"
     },
     "RunState": {
