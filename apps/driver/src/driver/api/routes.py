@@ -87,6 +87,13 @@ async def build(
     return BuildAccepted(run_id=run_id, frames_received=len(frame_paths))
 
 
+@router.post('/runs/{run_id}/skip-scan', status_code=status.HTTP_202_ACCEPTED)
+async def skip_scan(run_id: UUID, runs: Runs) -> BuildAccepted:
+    # An empty capture makes the builder install the bundled fallback mesh.
+    await runs.accept_build(run_id, Capture(frames=[]))
+    return BuildAccepted(run_id=run_id, frames_received=0)
+
+
 @router.post('/connect')
 async def connect(body: ConnectRequest, runs: Runs) -> ConnectResponse:
     return await runs.connect(body.device_id)

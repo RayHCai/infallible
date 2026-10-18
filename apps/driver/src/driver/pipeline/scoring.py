@@ -76,3 +76,10 @@ def _eval(node: ast.expr, state: Mapping[str, Any]) -> Any:
 
 def evaluate(predicate: str, state: Mapping[str, Any]) -> bool:
     return bool(_eval(_parse(predicate), state))
+
+
+def explain(predicate: str, state: Mapping[str, Any]) -> str:
+    """Human-readable reason a predicate failed: the expectation plus the state it read."""
+    names = sorted({n.id for n in ast.walk(_parse(predicate)) if isinstance(n, ast.Name)})
+    actual = ', '.join(f'{n} = {state.get(n)!r}' for n in names)
+    return f'Expected {predicate}, but {actual}.' if actual else f'Expected {predicate}.'

@@ -15,7 +15,7 @@ import httpx
 from pydantic import ValidationError
 from redis.exceptions import ResponseError
 
-from driver.pipeline.scoring import PredicateError, evaluate
+from driver.pipeline.scoring import PredicateError, evaluate, explain
 from driver.services.launcher import AgentSpec
 from driver.services.qr import qr_png_b64
 from infallible_contracts import (
@@ -92,7 +92,7 @@ class ActiveRun:
     agents: list[Agent] = field(default_factory=list)
     next_task: dict[UUID, int] = field(default_factory=dict)
     finished: set[UUID] = field(default_factory=set)
-    errored: set[tuple[UUID, UUID]] = field(default_factory=set)
+    errored: dict[tuple[UUID, UUID], str] = field(default_factory=dict)
     background: set[asyncio.Task[None]] = field(default_factory=set)
 
     @property
@@ -266,7 +266,7 @@ class RunManager:
                     )
                 )
             case AgentError(task_id=UUID() as task_id):
-                active.errored.add((event.agent_id, task_id))
+                active.errored[event.agent_id, task_id] = event.message
             case TaskDone():
                 await self._score(active, event)
                 await self._dispatch_next(active, event.agent_id)
@@ -275,16 +275,23 @@ class RunManager:
 
     async def _score(self, active: ActiveRun, done: TaskDone) -> None:
         task = active.task(done.task_id)
+        reason: str | None = None
         if (done.agent_id, done.task_id) in active.errored:
             outcome = TaskOutcome.ERRORED
+            reason = active.errored[done.agent_id, done.task_id]
         else:
             try:
                 passed = evaluate(task.success, done.final_state)
-            except PredicateError:
+            except PredicateError as exc:
                 log.exception('task %s has an invalid success predicate', task.id)
                 outcome = TaskOutcome.ERRORED
+                reason = str(exc)
             else:
                 outcome = TaskOutcome.PASSED if passed else TaskOutcome.FAILED
+                if not passed:
+                    reason = explain(task.success, done.final_state)
+                    if not done.declared_done:
+                        reason = f'Ran out of steps after {done.steps}. {reason}'
         await self.db.upsert_task_result(
             TaskResult(
                 agent_id=done.agent_id, task_id=done.task_id, outcome=outcome,
@@ -293,7 +300,11 @@ class RunManager:
         )  # fmt: skip
         await self.broadcaster.publish(
             TaskScoredMessage(
-                run_id=active.run.id, agent_id=done.agent_id, task_id=done.task_id, outcome=outcome
+                run_id=active.run.id,
+                agent_id=done.agent_id,
+                task_id=done.task_id,
+                outcome=outcome,
+                reason=reason,
             )
         )
 

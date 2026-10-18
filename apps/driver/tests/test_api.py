@@ -60,6 +60,14 @@ def test_full_pipeline_until_running(client: TestClient, launcher: FakeLauncher)
     assert launcher.stopped
 
 
+def test_skip_scan_uses_fallback_mesh(client: TestClient) -> None:
+    run_id = client.post('/start').json()['run_id']
+    assert client.post(f'/runs/{run_id}/skip-scan').status_code == 202
+    _wait_for_state(client, run_id, 'connect')
+    assert client.get(f'/runs/{run_id}/mesh').content[:4] == b'glTF'
+    assert client.post(f'/runs/{run_id}/skip-scan').status_code == 409
+
+
 def test_connect_before_build_is_rejected(client: TestClient) -> None:
     client.post('/start')
     assert client.post('/connect', json={}).status_code == 409
