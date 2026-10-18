@@ -3,6 +3,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GlobalFonts, createCanvas } from '@napi-rs/canvas';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { makeHelpers } from './models/common.js';
@@ -23,6 +24,16 @@ globalThis.FileReader ??= class {
     });
   }
 };
+
+// Node has no DOM: back decals and GLTFExporter's image path with a native canvas.
+// The exporter mistakes canvases with a `data` member for DataTextures, so hide it.
+const newCanvas = () => Object.defineProperty(createCanvas(1, 1), 'data', { value: undefined });
+globalThis.HTMLCanvasElement = newCanvas().constructor;
+globalThis.document = { createElement: newCanvas };
+// system-ui and sans-serif resolve to a condensed face here; alias a real UI font.
+const ui = ['Segoe UI', 'Helvetica Neue', 'Helvetica', 'Arial', 'DejaVu Sans', 'Liberation Sans'];
+const font = ui.find((f) => GlobalFonts.has(f));
+if (font) GlobalFonts.setAlias(font, 'system-ui');
 
 const out = join(dirname(fileURLToPath(import.meta.url)), 'models', 'glb');
 await mkdir(out, { recursive: true });
