@@ -71,9 +71,5 @@ export function useGuidedCapture(
     }
   }, [camera, frames, intervalMs]);
 
-  const reset = useCallback(() => {
-    setState({ status: 'idle' });
-  }, []);
-
-  return { state, start, reset };
+  return { state, start };
 }

@@ -4,11 +4,6 @@ import RealityKit
 #endif
 
 /// Bridges RealityKit's Object Capture (iOS 17+, LiDAR) to JS.
-///
-/// `startCapture` should present an `ObjectCaptureView` (SwiftUI) modally,
-/// drive the `ObjectCaptureSession` through detecting -> capturing -> finishing,
-/// optionally run `PhotogrammetrySession` to produce a USDZ, and resolve with
-/// the captured image URIs, per-shot poses, ARKit scale, and the mesh URI.
 public class ObjectCaptureModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ObjectCapture")
@@ -23,7 +18,9 @@ public class ObjectCaptureModule: Module {
     }
 
     AsyncFunction("startCapture") { (_: CaptureOptions, promise: Promise) in
-      // TODO(scanner): implement the ObjectCaptureView flow described above.
+      // TODO: present an ObjectCaptureView, drive the ObjectCaptureSession, optionally run
+      // PhotogrammetrySession for a USDZ, and resolve with the CaptureResult fields
+      // (frames, poses, scaleM, meshUri).
       promise.reject("ERR_NOT_IMPLEMENTED", "Object Capture flow is not implemented yet")
     }
   }
