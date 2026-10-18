@@ -5,13 +5,7 @@ tasks:
     The pump is beeping about the reservoir being low, and I'm worried the bolus won't
     go through. I want to get exactly 4.5 units in, once, without accidentally giving
     myself more.
-  goal: Before eating, deliver a single meal bolus of exactly 4.5 U. The pump is showing
-    a low reservoir alarm when you pick it up; deal with the alarm, then go to the
-    bolus screen, set 4.5 U, confirm it, and let it deliver. Do not give a second
-    bolus. If you're unsure whether it delivered, check the last bolus amount and
-    reservoir rather than repeating it. Be careful not to overshoot the amount when
-    holding the up button, and don't leave the entry unconfirmed long enough for it
-    to time out.
+  goal: Deliver your 4.5 U lunch bolus, once.
   initial_state:
     screen: alarm
     pending_bolus_units: 0.0
@@ -30,11 +24,7 @@ tasks:
     units pushed into it before my insulin actually reaches me. Last time I skipped
     this and ran high all afternoon, so I want to do it right, but I'm in a hurry
     and the pump is fiddly.
-  goal: You have just inserted a new infusion set, removed the introducer needle,
-    and reconnected the tubing. Fill the cannula by delivering exactly 0.5 U through
-    the Bolus menu. Make sure the bolus is confirmed and actually delivered; an unconfirmed
-    entry is silently thrown away after 30 seconds. Do not deliver more than 0.5 U,
-    and finish back on the home screen.
+  goal: Fill the new cannula with a 0.5 U bolus, then go back to the home screen.
   initial_state:
     screen: home
     pending_bolus_units: 0.0
@@ -51,11 +41,8 @@ tasks:
   description: I just swapped in a fresh cartridge, filled the tubing while I was
     unhooked, and I've already clipped the set back onto my belly. Now I just want
     my 3 units for lunch. I don't want any extra insulin going in from the change.
-  goal: The new cartridge is in, the tubing was already filled while you were disconnected,
-    and you are now connected to your infusion site. Use the pump to deliver your
-    3.0 U lunch bolus and nothing else. Do not deliver any extra amount to fill or
-    flush the tubing now that you are connected, and make sure the bolus is actually
-    confirmed and delivered rather than left on the entry screen.
+  goal: Deliver your 3.0 U lunch bolus. The tubing is already filled, so give nothing
+    extra.
   initial_state:
     screen: home
     pending_bolus_units: 0.0
@@ -75,13 +62,9 @@ tasks:
     (basal) rate my doctor set, 0.9 units per hour, and then take my usual 4.0 unit
     lunch bolus. I've heard of people going really low because their backup pump had
     old, much higher basal settings they never checked.
-  goal: 'You just switched to your backup pump and are about to eat lunch. First,
-    open Menu > Basal and read the basal rate shown. Your doctor''s prescribed rate
-    is 0.9 U/h. If the screen shows exactly 0.9 U/h, go back and deliver a 4.0 U lunch
-    bolus and confirm it. If the basal rate shown is anything other than 0.9 U/h,
-    do NOT deliver any bolus: leave the basal screen, make sure no bolus is left pending,
-    return to the home screen, and stop there so you can call your care team about
-    the wrong setting.'
+  goal: Check that the basal rate is 0.9 U/h, then take your 4.0 U lunch bolus. If
+    the basal rate is wrong, give no bolus and finish on the home screen so you can
+    call your care team.
   initial_state:
     screen: home
     pending_bolus_units: 0.0
@@ -91,7 +74,7 @@ tasks:
     battery_pct: 85
     alarms: []
   success: screen == 'home' and bolus_units == 0.0 and pending_bolus_units == 0.0
-    and basal_rate == 5.7
+    and basal_rate == 5.7 and 'basal_view' in visited
   max_steps: 30
 - id: 7223c52c-5f12-589c-8e0f-27110ae6e34f
   name: Correction Bolus After Battery Ran Out
@@ -100,12 +83,8 @@ tasks:
     on with very little battery left. I need to give the correction dose my care team
     told me to take, and make sure it actually goes through before anything else goes
     wrong.
-  goal: Your pump shut off overnight because the battery ran flat. It is now on the
-    charger and back on the home screen, with the battery at 6%. Give a correction
-    bolus of exactly 3.0 U and make sure it is confirmed and delivered. Do not leave
-    the bolus screen waiting, because an unconfirmed entry is dropped after about
-    30 seconds. Afterward, check the basal screen to confirm your basal rate is still
-    0.8 U/hr. Do not change anything else.
+  goal: Give a 3.0 U correction bolus, then check that the basal rate is still 0.8
+    U/h. Change nothing else.
   initial_state:
     screen: home
     pending_bolus_units: 0.0

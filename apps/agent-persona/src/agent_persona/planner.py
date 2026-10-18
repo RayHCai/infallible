@@ -158,7 +158,8 @@ class Planner:
                         {
                             'type': 'text',
                             'text': (
-                                f'Goal: {task.goal}\nControls you can find:\n{found}\n'
+                                f'In your words: {task.description}\nGoal: {task.goal}\n'
+                                f'Controls you can find:\n{found}\n'
                                 f'You just heard: {heard}\nYour notes so far: {notes}\n'
                                 f'Your last turns:\n{recent}'
                             ),

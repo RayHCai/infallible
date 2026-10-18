@@ -179,7 +179,8 @@ bolus_confirm, delivering, basal_view (read-only), alarm (ok twice clears). Unco
 bolus entry times out to home after 30 s and is silently discarded. Holding a
 button auto-repeats after 600 ms. A low_reservoir alarm fires at <= 20 U.
 Firmware state (for initial_state and success): screen, bolus_units (last
-delivered), pending_bolus_units, basal_rate, reservoir_units, battery_pct, alarms.
+delivered), pending_bolus_units, basal_rate, reservoir_units, battery_pct, alarms,
+visited (screens shown since reset, e.g. "'basal_view' in visited").
 initial_state accepts: screen, pending_bolus_units, bolus_units, basal_rate,
 reservoir_units, battery_pct, alarms. success is a Python boolean expression over
 those state names only (comparisons, and/or/not, `in`), e.g. "bolus_units == 2.5".
@@ -201,7 +202,10 @@ class InitialStateDraft(BaseModel):
 class TaskDraft(BaseModel):
     name: str = Field(description='Short Title Case name, e.g. "Meal Bolus With Low Reservoir".')
     description: str = Field(description='What the user is trying to do, in their words.')
-    goal: str = Field(description='Instruction given to the agent, with concrete values.')
+    goal: str = Field(
+        description='The objective with concrete values, in one or two sentences. No steps, '
+        'hints or warnings about pitfalls: the agent must hit them on its own.'
+    )
     initial_state: InitialStateDraft = Field(
         description='Set every value the goal or success depends on; null keeps the default.'
     )
@@ -322,7 +326,8 @@ def build() -> None:
             + '\n\nSample narratives:\n'
             + '\n\n'.join(narrative(r) for r in sample)
             + '\n\nThe goal must be achievable on this firmware and give the agent room to '
-            'make the most common mistake; success must catch that mistake.',
+            'make the most common mistake; success must catch that mistake and must be false '
+            'in initial_state.',
             TaskDraft,
         )
         check_predicate(draft.success)
@@ -373,6 +378,8 @@ def build() -> None:
         if VISION & need:
             vision = [r for g in by_profile.values() for r in g if Factor.VISION in r['factors']]
             sample += rng.sample(vision, min(N_SAMPLES // 2, len(vision)))
+        # The guiding_prompt alone barely changes what the agent does; a modifier does.
+        must = need or set(ModifierId)
         persona_draft = synth(
             client,
             f'Write one persona for usability-testing an insulin pump. Do not give the person '
@@ -384,18 +391,18 @@ def build() -> None:
             'The persona is the person pressing the buttons (for a parent operator, the parent; '
             'estimate their age). Ground every trait in the narratives below; do not invent '
             'diagnoses they do not support. Modifiers are perception/motor degradations '
-            f'({", ".join(ModifierId)}); add one only if the profile supports it, with numeric '
+            f'({", ".join(ModifierId)}); add the ones the profile supports, with numeric '
             'parameters (blur: sigma ~1-4; contrast_loss: factor 0-1; color_deficiency: kind; '
-            'tremor: amplitude 0-1, chance a press slips; hearing_loss, neuropathy: severity '
-            '0-1). '
-            + (f'This persona MUST have at least one of: {", ".join(need)}. ' if need else '')
+            'tremor: amplitude 0-1, chance a press slips; rushing: severity 0-1, chance a press '
+            'is held long enough to auto-repeat; hearing_loss, neuropathy: severity 0-1). '
+            + f'This persona MUST have at least one of: {", ".join(must)}. '
             + 'The guiding_prompt should make the agent act as this person '
             'would, including their typical mistakes, not as an expert.\n\nSample narratives:\n'
             + '\n\n'.join(narrative(r) for r in sample),
             PersonaDraft,
         )
-        if need and not need & {m.id for m in persona_draft.modifiers}:
-            raise RuntimeError(f'persona {profile} is missing a modifier from {need}')
+        if not must & {m.id for m in persona_draft.modifiers}:
+            raise RuntimeError(f'persona {profile} is missing a modifier from {must}')
         personas.append(
             Persona.model_validate(
                 {

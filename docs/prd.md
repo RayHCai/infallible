@@ -131,7 +131,7 @@ Per-task loop (one task at a time, read from the task stream):
 1. Reset the firmware instance to the task's `initial_state`.
 2. **Snapshot:** pull the current screen framebuffer from firmware, ask the visualizer to render the device with that screen from the current eye pose (it also returns each button's projected box and whether it faces the eye or is occluded), apply vision modifiers, mix any firmware audio through audio modifiers. This is the frame context, taken before every plan, and pushed to the frame WebSocket.
 3. **Plan** (Sonnet): given persona, task, and frame, produce a short plan over a fixed action vocabulary: `press(button_id)`, `hold(button_id, ms)`, `turn(dial, steps)`, `rotate_view(axis, deg)`, `zoom(delta)`, `wait(ms)`, `read_screen`, `done`; each may carry a `repeat` count (e.g. 20 presses of +0.1 U). The prompt asks for the action *this person* would most likely take, not the correct one.
-4. **Act:** execute the whole plan in order, without re-looking. Physical actions pass through motor modifiers (a tremor can hit the adjacent button) and go to firmware. View actions move the eye.
+4. **Act:** execute the whole plan in order, without re-looking. Physical actions pass through motor modifiers (a tremor can hit the adjacent button; rushing can hold a press into auto-repeat) and go to firmware. View actions move the eye.
 5. Per executed action, emit an `action` event (options considered, chosen, firmware state after) to Redis and append to the local trace file.
 6. Re-snapshot and re-plan after every plan; cap at `max_steps` plans.
 7. On `done` or cap, emit `task_done` with the final firmware state. The driver scores it.
@@ -193,8 +193,8 @@ Offline script, run once:
 tasks:
   - id: UUID
     name: str
-    description: str          # what the user is trying to do, in their words
-    goal: str                 # given to the agent
+    description: str          # what the user is trying to do, in their words (given to the agent)
+    goal: str                 # objective with concrete values, no hints (given to the agent)
     initial_state: {}         # firmware reset state
     success: "bolus_units == 2.5"
     max_steps: 25
