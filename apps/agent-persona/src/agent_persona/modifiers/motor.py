@@ -33,3 +33,11 @@ def tremor(
     if slipped is None:
         return action
     return action.model_copy(update={'button_id': slipped.id})
+
+
+def rushing(action: Action, rng: random.Random, severity: float = 0.2, **_: Any) -> Action:
+    """With probability ``severity``, a press is held ~1 s: long enough to trigger
+    auto-repeat on most pumps, so values overshoot and confirm screens get skipped."""
+    if not isinstance(action, PressAction) or rng.random() >= severity:
+        return action
+    return HoldAction(button_id=action.button_id, ms=rng.randint(800, 1200))

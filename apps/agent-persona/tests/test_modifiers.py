@@ -5,10 +5,11 @@ import numpy as np
 from PIL import Image
 
 from agent_persona.modifiers import ModifierPipeline
-from agent_persona.modifiers.motor import tremor
+from agent_persona.modifiers.motor import rushing, tremor
 from agent_persona.planner import PlannedAction
 from infallible_contracts import (
     BoxRegion,
+    HoldAction,
     Modifier,
     ModifierId,
     Persona,
@@ -58,6 +59,18 @@ def test_tremor_slips_to_nearest_button() -> None:
 def test_tremor_ignores_non_physical_actions() -> None:
     action = WaitAction(ms=100)
     assert tremor(action, BUTTONS, random.Random(0), amplitude=1.0) is action
+
+
+def test_rushing_holds_a_press_into_auto_repeat() -> None:
+    held = rushing(PressAction(button_id='ok'), random.Random(0), severity=1.0)
+    assert isinstance(held, HoldAction)
+    assert held.button_id == 'ok'
+    assert held.ms >= 800
+
+
+def test_rushing_leaves_holds_alone() -> None:
+    action = HoldAction(button_id='up', ms=200)
+    assert rushing(action, random.Random(0), severity=1.0) is action
 
 
 def test_hearing_loss_cuts_high_frequencies_most() -> None:

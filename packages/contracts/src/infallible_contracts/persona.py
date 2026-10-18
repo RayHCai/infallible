@@ -16,6 +16,7 @@ class ModifierId(StrEnum):
     TREMOR = 'tremor'
     HEARING_LOSS = 'hearing_loss'
     NEUROPATHY = 'neuropathy'
+    RUSHING = 'rushing'
 
 
 class Modifier(Contract):

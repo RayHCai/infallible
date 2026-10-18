@@ -52,4 +52,6 @@ class ModifierPipeline:
         for m in self.modifiers:
             if m.id == ModifierId.TREMOR:
                 action = motor.tremor(action, buttons, self.rng, **m.parameters)
+            elif m.id == ModifierId.RUSHING:
+                action = motor.rushing(action, self.rng, **m.parameters)
         return action
