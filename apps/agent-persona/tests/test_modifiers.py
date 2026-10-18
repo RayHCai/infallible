@@ -1,6 +1,7 @@
 import random
 from uuid import uuid4
 
+import numpy as np
 from PIL import Image
 
 from agent_persona.modifiers import ModifierPipeline
@@ -59,13 +60,17 @@ def test_tremor_ignores_non_physical_actions() -> None:
     assert tremor(action, BUTTONS, random.Random(0), amplitude=1.0) is action
 
 
-def test_hearing_loss_full_severity_drops_everything() -> None:
+def test_hearing_loss_cuts_high_frequencies_most() -> None:
     pipeline = ModifierPipeline.for_persona(
         _persona(Modifier(id=ModifierId.HEARING_LOSS, parameters={'severity': 1.0})), seed=0
     )
-    assert pipeline.audio(['alarm', 'click']) == []
+    t = np.arange(16_000) / 16_000
+    low, high = (np.sin(2 * np.pi * f * t) for f in (250, 4000))
+    assert (
+        np.abs(pipeline.audio(low, 16_000)).max() > 10 * np.abs(pipeline.audio(high, 16_000)).max()
+    )
 
 
 def test_planned_action_maps_to_contract_action() -> None:
-    planned = PlannedAction(kind='hold', target='up', amount=1500)
+    planned = PlannedAction(kind='hold', target='up', amount=1500, repeat=None)
     assert planned.to_action().model_dump() == {'kind': 'hold', 'button_id': 'up', 'ms': 1500}

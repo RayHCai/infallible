@@ -3,11 +3,12 @@ from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from typesafe_sdk import NoulAnswer
 
 from agent_persona.modifiers import ModifierPipeline
-from agent_persona.perception import Perceiver, build_controls
+from agent_persona.modifiers.vision import blur
+from agent_persona.perception import Perceiver, build_controls, contrast
 from infallible_contracts import (
     BoxRegion,
     MeshAnnotations,
@@ -21,15 +22,24 @@ from infallible_contracts import (
 ANNOTATIONS = MeshAnnotations(
     screen=BoxRegion(id='screen', x=0.1, y=0.1, w=0.8, h=0.35),
     buttons=[
-        BoxRegion(id='menu', x=0.1, y=0.52, w=0.2, h=0.12),
-        BoxRegion(id='up', x=0.4, y=0.52, w=0.2, h=0.12),
-        BoxRegion(id='ok', x=0.7, y=0.72, w=0.2, h=0.12),
+        BoxRegion(id='menu', x=0.1, y=0.52, w=0.2, h=0.12, anchor=[-0.018, -0.004, 0.012]),
+        BoxRegion(id='up', x=0.4, y=0.52, w=0.2, h=0.12, anchor=[0.0, -0.004, 0.012]),
+        BoxRegion(id='ok', x=0.7, y=0.72, w=0.2, h=0.12, anchor=[0.018, -0.02, 0.012]),
     ],
 )
 CONTROLS = build_controls(ANNOTATIONS)
-VIEW = Image.new('RGB', (640, 480), 'white')
-BARE = Image.new('RGB', (640, 480), 'black')  # buttons stand out fully against it
 BOXES = {'menu': (100, 100, 200, 160), 'up': (250, 100, 350, 160), 'ok': (400, 300, 500, 360)}
+
+
+def _device(button: int, surface: int = 60) -> Image.Image:
+    img = Image.new('RGB', (640, 480), (surface,) * 3)
+    draw = ImageDraw.Draw(img)
+    for box in BOXES.values():
+        draw.ellipse(box, fill=(button,) * 3)
+    return img
+
+
+VIEW = _device(button=150)
 
 
 class FakeJev:
@@ -45,7 +55,7 @@ class FakeJev:
 
 def _perceiver(client: Any = None) -> Perceiver:
     return Perceiver(
-        CONTROLS, client, 'jev-1.14.0', read_threshold=0.3, min_in_frame=0.5, min_contrast=0.06
+        CONTROLS, client, 'jev-1.14.0', read_threshold=0.5, min_in_frame=0.5, min_contrast=0.06
     )
 
 
@@ -58,38 +68,44 @@ def test_controls_use_neutral_handles_and_positions() -> None:
 
 
 def test_without_jev_seen_buttons_are_labelled() -> None:
-    p = asyncio.run(_perceiver().perceive(VIEW, BARE, BOXES, felt=set()))
-    assert p.prompt_lines()[0] == 'b1: button labelled "menu" (top-left button below the screen)'
+    p = asyncio.run(_perceiver().perceive(VIEW, BOXES, felt=set()))
+    assert p.prompt_lines()[0] == 'b1: button marked "menu" (top-left button below the screen)'
 
 
 def test_jev_only_judges_readability() -> None:
     jev = FakeJev({'b1': 0.1})
-    p = asyncio.run(_perceiver(jev).perceive(VIEW, BARE, BOXES, felt=set()))
+    p = asyncio.run(_perceiver(jev).perceive(VIEW, BOXES, felt=set()))
     assert jev.questions == ['b1', 'b2', 'b3']
     assert p.prompt_lines()[:2] == [
-        'b1: top-left button below the screen, label unreadable',
-        'b2: button labelled "up" (top-middle button below the screen)',
+        'b1: top-left button below the screen, marking unreadable',
+        'b2: button marked "up" (top-middle button below the screen)',
     ]
 
 
+def test_contrast_fades_with_blur() -> None:
+    sharp = contrast(VIEW, BOXES['up'])
+    assert sharp > 1
+    assert 0 < contrast(blur(VIEW, sigma=30), BOXES['up']) < sharp
+
+
 def test_low_contrast_buttons_are_not_seen() -> None:
-    faint = Image.new('RGB', (640, 480), (250, 250, 250))
     jev = FakeJev({})
-    p = asyncio.run(_perceiver(jev).perceive(VIEW, faint, BOXES, felt={'ok'}))
+    p = asyncio.run(_perceiver(jev).perceive(_device(button=61), BOXES, felt={'ok'}))
     assert jev.questions == []
     assert p.prompt_lines() == [
         "b3: you can feel the bottom-right button below the screen but can't see it"
     ]
 
 
-def test_out_of_frame_buttons_skip_jev_and_need_touch() -> None:
+def test_hidden_or_out_of_frame_buttons_skip_jev_and_need_touch() -> None:
     jev = FakeJev({})
-    boxes = {**BOXES, 'menu': (-90, 100, 10, 160), 'ok': (700, 300, 800, 360)}
-    p = asyncio.run(_perceiver(jev).perceive(VIEW, BARE, boxes, felt={'menu'}))
+    # menu mostly off-frame; ok facing away or occluded, so the snapshot omits it
+    boxes = {'menu': (-90, 100, 10, 160), 'up': BOXES['up']}
+    p = asyncio.run(_perceiver(jev).perceive(VIEW, boxes, felt={'menu'}))
     assert jev.questions == ['b2']
     assert p.prompt_lines() == [
         "b1: you can feel the top-left button below the screen but can't see it",
-        'b2: button labelled "up" (top-middle button below the screen)',
+        'b2: button marked "up" (top-middle button below the screen)',
     ]
 
 

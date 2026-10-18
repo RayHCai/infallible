@@ -131,7 +131,7 @@ files = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["qrcode.*", "trimesh.*", "moderngl.*"]
+module = ["qrcode.*", "trimesh.*"]
 ignore_missing_imports = true
 
 [tool.pydantic-mypy]

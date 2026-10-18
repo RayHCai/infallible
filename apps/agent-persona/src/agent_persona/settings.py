@@ -32,11 +32,13 @@ class AgentSettings(BaseSettings):
     planner_effort: Effort = 'low'
     planner_max_tokens: int = 8000
     history_window: int = Field(default=8, ge=0)
+    # Snapshots come from the open visualizer; a step fails if none arrives in time.
+    render_timeout_s: float = Field(default=30, gt=0)
 
-    # Jev readability checks on the degraded frame; off = every seen label is readable.
+    # Jev readability of button markings on the degraded frame; off = every seen marking is readable.
     perception_jev: bool = True
     perception_model: str = 'jev-1.14.0'
-    perception_read_threshold: float = Field(default=0.3, ge=0, le=1)
+    perception_read_threshold: float = Field(default=0.5, ge=0, le=1)
     perception_min_in_frame: float = Field(default=0.5, ge=0, le=1)
     perception_min_contrast: float = Field(default=0.06, ge=0)
 

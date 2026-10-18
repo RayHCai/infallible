@@ -8,6 +8,7 @@ from infallible_contracts import Action, BoxRegion, Modifier, ModifierId, Person
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    import numpy as np
     from PIL import Image
 
 _VISION: dict[ModifierId, Callable[..., Image.Image]] = {
@@ -32,11 +33,11 @@ class ModifierPipeline:
                 img = fn(img, **m.parameters)
         return img
 
-    def audio(self, cues: list[str]) -> list[str]:
+    def audio(self, samples: np.ndarray, rate: int) -> np.ndarray:
         for m in self.modifiers:
             if m.id == ModifierId.HEARING_LOSS:
-                cues = audio.hearing_loss(cues, self.rng, **m.parameters)
-        return cues
+                samples = audio.hearing_loss(samples, rate, **m.parameters)
+        return samples
 
     def touch(self, button_ids: list[str], seed: int) -> set[str]:
         """Buttons findable by feel. Rolled once per task (own seeded RNG) so

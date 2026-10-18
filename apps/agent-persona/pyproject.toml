@@ -6,6 +6,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
   "infallible-contracts",
   "anthropic>=1.0",
+  "numpy>=2.0",
   "pillow>=11.0",
   "pydantic-settings>=2.7",
   "redis>=5.2",
@@ -14,8 +15,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Full 3D headless mesh rendering (needs EGL/OSMesa at runtime).
-render = ["moderngl>=5.12", "numpy>=2.2", "trimesh>=4.6"]
 # Local-copy firmware mode: the agent spawns its own private emulator.
 local-firmware = ["infallible-firmware"]
 

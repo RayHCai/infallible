@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import io
+import itertools
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -10,8 +11,9 @@ from PIL import Image
 from redis.exceptions import ResponseError
 
 from agent_persona.firmware_client import FirmwareClient, FirmwareError
+from agent_persona.hearing import Heard, listen
 from agent_persona.planner import Planner, build_system_prompt
-from agent_persona.renderer import Camera, Renderer
+from agent_persona.renderer import Box, Renderer, apply_view
 from agent_persona.trace import TaskTrace
 from infallible_contracts import (
     Action,
@@ -20,17 +22,16 @@ from infallible_contracts import (
     AgentEvent,
     AgentReady,
     DoneAction,
+    EyePose,
     FirmwareInput,
     HoldAction,
     Persona,
     PressAction,
-    RotateViewAction,
     Task,
     TaskDone,
     TaskStarted,
     TurnAction,
     WaitAction,
-    ZoomAction,
 )
 from infallible_contracts.paths import DataLayout
 from infallible_contracts.streams import (
@@ -56,7 +57,7 @@ log = logging.getLogger(__name__)
 
 PRESS_MS = 120
 MAX_WAIT_MS = 10_000
-READ_BLOCK_MS = 5_000
+READ_BLOCK_MS = 2_000  # must stay under redis-py's 5 s default socket_timeout
 
 
 class PersonaAgent:
@@ -84,8 +85,8 @@ class PersonaAgent:
         self.layout = DataLayout(settings.data_dir)
         self.buttons = renderer.annotations.buttons
         self.system_prompt = build_system_prompt(persona)
+        self._snapshots = 0
 
-    # ------------------------------------------------------------------ #
     async def run(self) -> None:
         stream, group = tasks_stream(self.s.run_id), agent_consumer_group(self.s.agent_id)
         try:
@@ -109,7 +110,6 @@ class PersonaAgent:
                     await self._run_task_safely(dispatch.task)
                 await self.redis.xack(stream, group, entry_id)
 
-    # ------------------------------------------------------------------ #
     async def _run_task_safely(self, task: Task) -> None:
         """One failing task (API error, missing credentials, firmware hiccup) must
         not kill the agent: report it and let the driver move on to the next task."""
@@ -136,7 +136,7 @@ class PersonaAgent:
     async def _run_task(self, task: Task) -> None:
         run_id, agent_id = self.s.run_id, self.s.agent_id
         state = await self.firmware.reset(task.initial_state)
-        camera = Camera()
+        pose = EyePose()
         trace_path = self.layout.trace(self.s.run_id, self.s.agent_id, task.id)
         touch_seed = self.modifiers.rng.getrandbits(32)
         felt = self.modifiers.touch([b.id for b in self.buttons], touch_seed)
@@ -144,74 +144,97 @@ class PersonaAgent:
             trace_path, self.s.agent_id, self.persona.id, task.id, touch_seed=touch_seed
         )
         history: list[str] = []
+        progress = ''
         declared_done = False
+        step = 0  # executed actions; task.max_steps bounds decisions
         await self._emit(TaskStarted(run_id=run_id, agent_id=agent_id, task_id=task.id))
 
-        for step in range(task.max_steps):
-            view, bare, audio = await self._snapshot(camera, step)
-            perception = await self.perceiver.perceive(
-                view, bare, self.renderer.button_boxes(camera), felt
-            )
+        for decision_no in range(task.max_steps):
+            view, boxes, heard = await self._snapshot(pose, step)
+            perception = await self.perceiver.perceive(view, boxes, felt)
+            audio = [h.description for h in heard if h.description]
             decision = await self.planner.decide(
-                self.system_prompt, task, view, history[-self.s.history_window :], audio,
+                self.system_prompt, task, view, history[-self.s.history_window :], progress, audio,
                 perception.prompt_lines(),
             )  # fmt: skip
-            intended = self.perceiver.resolve(decision.action.to_action())
-            executed = self.modifiers.motor(intended, self.buttons)
-            await self._act(executed, camera)
-            state = await self.firmware.state()
+            await self.frames.publish(view, self._meta(step, decision.reasoning, heard))
 
-            await self.frames.publish(
-                view, {'step': step, 'reasoning': decision.reasoning, 'audio': audio}
-            )
+            acted: list[dict[str, Any]] = []
+            moves: list[str] = []
+            for planned in decision.plan():
+                intended = self.perceiver.resolve(planned)
+                executed = self.modifiers.motor(intended, self.buttons)
+                await self._act(executed)
+                pose = apply_view(pose, executed)
+                state = await self.firmware.state()
+                acted.append(
+                    {
+                        'step': step,
+                        'intended': intended.model_dump(),
+                        'executed': executed.model_dump(),
+                        'state_after': state.model_dump(),
+                    }
+                )
+                await self._emit(
+                    ActionEvent(
+                        run_id=run_id,
+                    agent_id=agent_id, task_id=task.id, step=step, options=decision.options, chosen=executed,
+                        reasoning=decision.reasoning, state_after=state.model_dump(),
+                        trace_path=self.layout.relative(trace_path),
+                    )
+                )  # fmt: skip
+                moves.append(_describe(executed, self.perceiver.handle_of))
+                step += 1
+                if isinstance(executed, DoneAction):
+                    declared_done = True
+                    break
+
             trace.append(
                 {
-                    'step': step,
+                    'decision': decision_no,
                     'options': decision.options,
                     'reasoning': decision.reasoning,
-                    'intended': intended.model_dump(),
-                    'executed': executed.model_dump(),
-                    'heard': audio,
+                    'progress': decision.progress,
+                    'heard': [{'cue': h.cue, 'heard': h.description} for h in heard],
                     'perception': perception.trace(),
-                    'state_after': state.model_dump(),
+                    'actions': acted,
                 }
             )
-            await self._emit(
-                ActionEvent(
-                    run_id=run_id,
-                agent_id=agent_id, task_id=task.id, step=step, options=decision.options, chosen=executed,
-                    reasoning=decision.reasoning, state_after=state.model_dump(),
-                    trace_path=self.layout.relative(trace_path),
-                )
-            )  # fmt: skip
-            history.append(_describe(executed, self.perceiver.handle_of))
-            if isinstance(executed, DoneAction):
-                declared_done = True
+            # Keep the conclusion, not just the moves: anonymous handles alone don't say what was done.
+            history.append(f'{decision.reasoning} -> {_summarise(moves)}')
+            progress = decision.progress
+            if declared_done:
                 break
 
         trace.finish(state.model_dump(), declared_done)
         await self._emit(
             TaskDone(
                 run_id=run_id,
-                agent_id=agent_id, task_id=task.id, steps=len(trace.steps),
+                agent_id=agent_id, task_id=task.id, steps=step,
                 declared_done=declared_done, final_state=state.model_dump(),
             )
         )  # fmt: skip
 
-    # ------------------------------------------------------------------ #
     async def _snapshot(
-        self, camera: Camera, step: int
-    ) -> tuple[Image.Image, Image.Image, list[str]]:
-        """Degraded view, the same view without buttons (contrast baseline), and audio."""
+        self, pose: EyePose, step: int
+    ) -> tuple[Image.Image, dict[str, Box], list[Heard]]:
+        """Degraded 3D snapshot from the eye, the buttons it can see, and what was heard
+        since the last one."""
         fw_frame = await self.firmware.frame()
         screen = Image.open(io.BytesIO(base64.b64decode(fw_frame.png_b64))).convert('RGB')
-        view = self.modifiers.vision(self.renderer.render(screen, camera))
-        bare = self.modifiers.vision(self.renderer.render(screen, camera, buttons=False))
-        audio = self.modifiers.audio(fw_frame.audio)
-        await self.frames.publish(view, {'step': step, 'reasoning': None, 'audio': audio})
-        return view, bare, audio
+        snap = await self.renderer.snapshot(screen, pose)
+        view = self.modifiers.vision(snap.image)
+        heard = listen(fw_frame.audio, self.modifiers.audio)
+        self._snapshots += 1
+        await self.frames.publish(view, self._meta(step, None, heard))
+        return view, snap.boxes, heard
 
-    async def _act(self, action: Action, camera: Camera) -> None:
+    def _meta(self, step: int, reasoning: str | None, heard: list[Heard]) -> dict[str, Any]:
+        # `snapshot` lets viewers play each snapshot's audio once across re-publishes.
+        audio = [{'heard': h.description, 'wav_b64': h.wav_b64} for h in heard if h.description]
+        return {'step': step, 'reasoning': reasoning, 'snapshot': self._snapshots, 'audio': audio}
+
+    async def _act(self, action: Action) -> None:
         match action:
             case PressAction(button_id=b):
                 await self.firmware.input(FirmwareInput(event='press', target=b))
@@ -223,14 +246,10 @@ class PersonaAgent:
                 await self.firmware.input(FirmwareInput(event='release', target=b))
             case TurnAction(dial=d, steps=n):
                 await self.firmware.input(FirmwareInput(event='turn', target=d, steps=n))
-            case RotateViewAction(axis=axis, deg=deg):
-                camera.rotate(axis, deg)
-            case ZoomAction(delta=delta):
-                camera.zoom(delta)
             case WaitAction(ms=ms):
                 await asyncio.sleep(min(ms, MAX_WAIT_MS) / 1000)
             case _:
-                pass  # read_screen / done: perception only
+                pass  # view actions move the eye; read_screen / done: perception only
 
     async def _emit(self, event: AgentEvent) -> None:
         await self.redis.xadd(events_stream(self.s.run_id), encode(event))  # type: ignore[arg-type]
@@ -242,3 +261,8 @@ def _describe(action: Action, handle_of: Callable[[str], str]) -> str:
     if 'button_id' in fields:
         fields['button_id'] = handle_of(fields['button_id'])
     return ' '.join([action.kind, *(f'{k}={v}' for k, v in fields.items())])
+
+
+def _summarise(moves: list[str]) -> str:
+    runs = [(m, len(list(g))) for m, g in itertools.groupby(moves)]
+    return ', '.join(m if n == 1 else f'{m} x{n}' for m, n in runs)

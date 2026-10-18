@@ -19,7 +19,7 @@ from agent_persona.frame_server import FrameServer
 from agent_persona.modifiers import ModifierPipeline
 from agent_persona.perception import Perceiver, build_controls
 from agent_persona.planner import Planner
-from agent_persona.renderer import create_renderer
+from agent_persona.renderer import Renderer, load_annotations
 from agent_persona.settings import AgentSettings
 from infallible_contracts.loaders import load_personas
 from infallible_contracts.paths import DataLayout
@@ -31,13 +31,14 @@ async def _amain(s: AgentSettings) -> None:
 
     redis = Redis.from_url(s.redis_url)
     planner = Planner(AsyncAnthropic(), s.planner_model, s.planner_effort, s.planner_max_tokens)
-    renderer = create_renderer(s.mesh_path)
+    annotations = load_annotations(s.mesh_path)
     jev = AsyncTypeSafeClient() if s.perception_jev else None
     perceiver = Perceiver(
-        build_controls(renderer.annotations), jev, s.perception_model,
+        build_controls(annotations), jev, s.perception_model,
         s.perception_read_threshold, s.perception_min_in_frame, s.perception_min_contrast,
     )  # fmt: skip
     frames = FrameServer()
+    renderer = Renderer(annotations, frames, s.render_timeout_s)
     await frames.start(s.frame_bind_host, s.frame_port)
 
     async with frames, open_firmware(s.firmware_endpoint) as firmware, redis:

@@ -1,5 +1,5 @@
 """Claude decision step: given persona, task and the current (degraded) frame,
-pick the action *this person* would most likely take — not the correct one."""
+plan the actions *this person* would most likely take — not the correct ones."""
 
 import base64
 import io
@@ -27,8 +27,10 @@ if TYPE_CHECKING:
 
     from agent_persona.settings import Effort
 
-# Server-side refusal fallback (opt-in beta); see the claude-api skill notes.
+# Server-side refusal fallback (opt-in beta).
 _FALLBACK_BETA = 'server-side-fallback-2026-07-01'
+# A runaway repeat shouldn't spend a whole task in one decision.
+MAX_PLAN_ACTIONS = 50
 
 
 class PlannedAction(BaseModel):
@@ -40,6 +42,9 @@ class PlannedAction(BaseModel):
     )
     amount: float | None = Field(
         description='ms for hold/wait, steps for turn, degrees for rotate_view, delta for zoom; null if unused'
+    )
+    repeat: int | None = Field(
+        description='times to do this back to back, e.g. 20 presses; null = once'
     )
 
     def to_action(self) -> Action:
@@ -67,7 +72,17 @@ class PlannedAction(BaseModel):
 class PlannerDecision(BaseModel):
     options: list[str] = Field(description='Actions this person is considering, in their words.')
     reasoning: str = Field(description='One short line, first person, in character.')
-    action: PlannedAction
+    progress: str = Field(
+        description='Your running notes on this goal: what you have already done and learned. '
+        'Shown to you next turn; carry earlier notes forward.'
+    )
+    actions: list[PlannedAction] = Field(
+        description='Done in order without looking again; you see the result next turn.'
+    )
+
+    def plan(self) -> list[Action]:
+        out = [a.to_action() for a in self.actions for _ in range(max(1, a.repeat or 1))]
+        return out[:MAX_PLAN_ACTIONS] or [ReadScreenAction()]
 
 
 class PlannerRefusalError(RuntimeError):
@@ -81,12 +96,15 @@ def build_system_prompt(persona: Persona) -> str:
         f'Age {a.age}, {a.gender}. {a.guiding_prompt}\n\n'
         'You are holding an insulin pump and trying to accomplish a goal with it. '
         'Each turn you see exactly what this person sees (vision limitations are already '
-        'applied to the image). Choose the single next action this person would most '
-        'plausibly take given their abilities, habits and confusion — not the correct or '
-        'optimal action. Mistakes are expected and valuable.\n\n'
+        'applied to the image). Plan the next action(s) this person would most plausibly '
+        'take given their abilities, habits and confusion — not the correct or optimal ones. '
+        'Mistakes are expected and valuable.\n\n'
+        'Plan as far ahead as this person would before looking at the device again: '
+        'e.g. if each press adds 0.1 U and they want 2 U more, one press with repeat=20. '
+        'The whole plan runs before you see the result.\n\n'
         'Each turn also lists the controls you can currently see or feel, by handle (b1, b2, ...). '
         'Only what is listed is known to you; moving the device may reveal more.\n'
-        'Actions: press(handle), hold(handle, ms), turn(dial, steps), rotate_view(axis, deg), '
+        'Actions (each may repeat): press(handle), hold(handle, ms), turn(dial, steps), rotate_view(axis, deg), '
         'zoom(delta), wait(ms), read_screen, done (when you believe the goal is achieved).'
     )
 
@@ -110,11 +128,13 @@ class Planner:
         task: Task,
         frame: Image.Image,
         history: list[str],
+        progress: str,
         audio: list[str],
         controls: list[str],
     ) -> PlannerDecision:
         recent = '\n'.join(f'- {h}' for h in history) or '- (none yet)'
-        heard = ', '.join(audio) or 'nothing'
+        heard = '; '.join(audio) or 'nothing'
+        notes = progress or '(none yet)'
         found = '\n'.join(f'- {c}' for c in controls) or '- (none)'
         response = await self._client.messages.parse(
             model=self._model,
@@ -139,7 +159,8 @@ class Planner:
                             'type': 'text',
                             'text': (
                                 f'Goal: {task.goal}\nControls you can find:\n{found}\n'
-                                f'You just heard: {heard}\nYour last actions:\n{recent}'
+                                f'You just heard: {heard}\nYour notes so far: {notes}\n'
+                                f'Your last turns:\n{recent}'
                             ),
                         },
                     ],

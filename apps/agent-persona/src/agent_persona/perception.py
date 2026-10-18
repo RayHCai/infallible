@@ -1,18 +1,20 @@
 """What the persona can find on the device this step: a button is seen if it
-is in frame and still stands out in the degraded frame, its label is read if
-Jev can read it there, and anything unseen may still be found by touch.
+faces the eye, is unoccluded and in frame, and still stands out from the
+surface around it in the degraded frame; its label is read if Jev can read it
+there (icons count: most pump buttons carry symbols, not words); anything
+unseen may still be found by touch.
 
 Jev only judges readability: calibration showed its "is the button there?"
 answers drift with blur, while pixel contrast tracks what a person sees.
 
-Controls reach the planner by neutral handle (``b1``...) so a button's label
-is only known when the persona can actually read it.
+Controls reach the planner by neutral handle (``b1``...) so what a button
+does is only known when the persona can actually make out its marking.
 """
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from PIL import ImageChops, ImageStat
+from PIL import ImageStat
 from typesafe_sdk import Image as JevImage
 from typesafe_sdk import Noul, NoulAnswer
 
@@ -46,7 +48,8 @@ def build_controls(annotations: MeshAnnotations) -> list[Control]:
 
 
 def _where(b: BoxRegion, buttons: list[BoxRegion]) -> str:
-    """Position within the button group, e.g. 'top-left'; ids would leak labels."""
+    """Position within the button group, e.g. 'top-left'; ids would leak labels.
+    Uses the 3D anchors (mesh y is up), the physical layout."""
 
     def side(v: float, vals: list[float], names: tuple[str, str, str]) -> str:
         lo, hi = min(vals), max(vals)
@@ -55,8 +58,8 @@ def _where(b: BoxRegion, buttons: list[BoxRegion]) -> str:
         t = (v - lo) / (hi - lo)
         return names[0] if t < 1 / 3 else names[2] if t > 2 / 3 else names[1]
 
-    row = side(b.y + b.h / 2, [o.y + o.h / 2 for o in buttons], ('top', 'middle', 'bottom'))
-    col = side(b.x + b.w / 2, [o.x + o.w / 2 for o in buttons], ('left', 'middle', 'right'))
+    row = side(-b.anchor[1], [-o.anchor[1] for o in buttons], ('top', 'middle', 'bottom'))
+    col = side(b.anchor[0], [o.anchor[0] for o in buttons], ('left', 'middle', 'right'))
     parts = [p for p in (row, col) if p]
     pos = 'centre' if parts in ([], ['middle'], ['middle', 'middle']) else '-'.join(parts)
     return f'{pos} button below the screen'
@@ -70,20 +73,32 @@ def in_frame(box: Box) -> float:
     return iw * ih / area if area > 0 else 0.0
 
 
-def contrast(view: Image.Image, bare: Image.Image, box: Box) -> float:
-    """How much the button changes its centre region vs the same degraded frame
-    without it, relative to that background's luminance (Weber-style)."""
+def _region(box: Box, scale: float) -> tuple[int, int, int, int]:
+    """``box`` scaled about its centre, clipped to the frame."""
     x0, y0, x1, y1 = box
-    cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 4, (y1 - y0) / 4
-    region = (
+    cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) * scale / 2, (y1 - y0) * scale / 2
+    return (
         max(0, int(cx - rx)), max(0, int(cy - ry)),
         min(OUTPUT_SIZE[0], int(cx + rx) + 1), min(OUTPUT_SIZE[1], int(cy + ry) + 1),
     )  # fmt: skip
-    if region[0] >= region[2] or region[1] >= region[3]:
+
+
+def _sum_area(lum: Image.Image, region: tuple[int, int, int, int]) -> tuple[float, int]:
+    area = max(0, region[2] - region[0]) * max(0, region[3] - region[1])
+    return (ImageStat.Stat(lum.crop(region)).sum[0], area) if area else (0.0, 0)
+
+
+def contrast(view: Image.Image, box: Box) -> float:
+    """Weber contrast of the button's centre against the ring of surface just
+    outside it, in the degraded frame: blur and contrast loss both shrink it."""
+    lum = view.convert('L')
+    inner_sum, inner_area = _sum_area(lum, _region(box, 0.5))
+    box_sum, box_area = _sum_area(lum, _region(box, 1.0))
+    outer_sum, outer_area = _sum_area(lum, _region(box, 1.6))
+    if not inner_area or outer_area <= box_area:
         return 0.0
-    diff = ImageStat.Stat(ImageChops.difference(view, bare).convert('L').crop(region)).mean[0]
-    base = ImageStat.Stat(bare.convert('L').crop(region)).mean[0]
-    return diff / max(base, 1.0)
+    ring = (outer_sum - box_sum) / (outer_area - box_area)
+    return abs(inner_sum / inner_area - ring) / max(ring, 1.0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,9 +114,9 @@ class Perceived:
     def prompt_line(self) -> str | None:
         c = self.control
         if self.visible and self.legible:
-            return f'{c.handle}: button labelled "{c.label}" ({c.where})'
+            return f'{c.handle}: button marked "{c.label}" ({c.where})'
         if self.visible:
-            return f'{c.handle}: {c.where}, label unreadable'
+            return f'{c.handle}: {c.where}, marking unreadable'
         if self.felt:
             return f"{c.handle}: you can feel the {c.where} but can't see it"
         return None
@@ -130,7 +145,7 @@ class Perception:
 
 
 class Perceiver:
-    """``client=None`` skips Jev: every seen label counts as readable."""
+    """``client=None`` skips Jev: every seen marking counts as readable."""
 
     def __init__(
         self,
@@ -151,15 +166,15 @@ class Perceiver:
         self._by_id = {c.button_id: c for c in controls}
 
     async def perceive(
-        self, view: Image.Image, bare: Image.Image, boxes: dict[str, Box], felt: set[str]
+        self, view: Image.Image, boxes: dict[str, Box], felt: set[str]
     ) -> Perception:
-        """``bare`` is ``view`` rendered without buttons, same modifiers applied."""
+        """``boxes`` holds only buttons facing the eye and unoccluded."""
         framed: dict[str, float] = {}
         contrasts: dict[str, float] = {}
         for c in self.controls:
             if box := boxes.get(c.button_id):
                 framed[c.handle] = in_frame(box)
-                contrasts[c.handle] = contrast(view, bare, box) if framed[c.handle] else 0.0
+                contrasts[c.handle] = contrast(view, box) if framed[c.handle] else 0.0
         seen = [
             c for c in self.controls
             if framed.get(c.handle, 0.0) >= self._min_in_frame
@@ -184,7 +199,9 @@ class Perceiver:
             return {}
         questions = {
             c.handle: Noul(
-                instructions=f'Can you read the label printed on the {c.where} in `view`?'
+                instructions=(
+                    f'Can you make out the symbol or text printed on the {c.where} in `view`?'
+                )
             )
             for c in seen
         }
