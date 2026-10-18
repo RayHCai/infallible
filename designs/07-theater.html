@@ -1,0 +1,1730 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Theater · Infallible design 07</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* 07 · Theater — one persona on stage at a time: a spotlit big line, the pump beside it, the cast along the floor. */
+      :root {
+        --bg: #141210;
+        --bg-2: #1b1815;
+        --panel: rgba(28, 24, 21, 0.96);
+        --ink: #f1ebe2;
+        --ink-2: rgba(241, 235, 226, 0.66);
+        --ink-3: rgba(241, 235, 226, 0.4);
+        --ink-4: rgba(241, 235, 226, 0.14);
+        --rule: rgba(241, 235, 226, 0.09);
+        --warm: #f2b469;
+        --warm-2: rgba(242, 180, 105, 0.16);
+        --green: #86c493;
+        --red: #e8735c;
+        --amber: #e9aa4b;
+        --hw: #c9a3ea;
+        --fw: #8db8e6;
+        --ix: #86c493;
+        --serif: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+        --sans: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --s1: 4px;
+        --s2: 8px;
+        --s3: 12px;
+        --s4: 16px;
+        --s5: 24px;
+        --s6: 32px;
+        --s7: 48px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 14px/1.5 var(--sans);
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1,
+      h2,
+      h3,
+      p,
+      ul,
+      ol,
+      dl,
+      dd,
+      figure,
+      blockquote {
+        margin: 0;
+      }
+      ul,
+      ol {
+        padding: 0;
+        list-style: none;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.35;
+      }
+      :focus-visible {
+        outline: 2px solid var(--warm);
+        outline-offset: 3px;
+        border-radius: 6px;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+      .eyebrow {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+
+      /* ---- frame ---- */
+      .theater {
+        position: relative;
+        height: 100%;
+        display: grid;
+        grid-template-rows: 60px minmax(0, 1fr) auto 132px;
+        isolation: isolate;
+      }
+      .spot {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background:
+          radial-gradient(ellipse 46% 60% at var(--sx, 40%) 40%, rgba(242, 180, 105, 0.17), transparent 70%),
+          radial-gradient(ellipse 80% 50% at 50% 115%, rgba(242, 180, 105, 0.06), transparent 70%);
+        transition: --sx 1s var(--ease);
+      }
+      body.locked .spot {
+        background:
+          radial-gradient(ellipse 52% 66% at 44% 42%, rgba(242, 180, 105, 0.2), transparent 70%),
+          radial-gradient(ellipse 80% 50% at 50% 115%, rgba(242, 180, 105, 0.05), transparent 70%);
+      }
+
+      /* header */
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: var(--s5);
+        padding: 0 var(--s6) 0 72px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .brand {
+        font-family: var(--serif);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 22px;
+        letter-spacing: -0.01em;
+      }
+      .meta {
+        display: flex;
+        gap: var(--s4);
+        color: var(--ink-3);
+        font-size: 12px;
+      }
+      .meta b {
+        color: var(--ink-2);
+        font-weight: 600;
+      }
+      .bar .spacer {
+        flex: 1;
+      }
+      .back {
+        display: none;
+        align-items: center;
+        gap: var(--s2);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        padding: 7px 12px;
+        border: 1px solid var(--ink-4);
+        border-radius: 999px;
+        transition: color 0.2s, border-color 0.2s;
+      }
+      .back:hover {
+        color: var(--ink);
+        border-color: var(--ink-3);
+      }
+      body.locked .back {
+        display: inline-flex;
+      }
+      .mode {
+        font-family: var(--serif);
+        font-style: italic;
+        color: var(--ink-2);
+        font-size: 15px;
+      }
+      .state {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--s2);
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .state i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--warm);
+        box-shadow: 0 0 0 0 rgba(242, 180, 105, 0.6);
+        animation: beacon 1.8s var(--ease) infinite;
+      }
+      body[data-state='evaluating'] .state i {
+        background: var(--amber);
+      }
+      body[data-state='completed'] .state i {
+        background: var(--green);
+        animation: none;
+      }
+      .evaluating,
+      .see {
+        display: none;
+      }
+      body[data-state='evaluating'] .evaluating {
+        display: inline-flex;
+      }
+      body[data-state='completed'] .see {
+        display: inline-flex;
+      }
+      .evaluating {
+        align-items: center;
+        gap: var(--s2);
+        font-family: var(--serif);
+        font-style: italic;
+        color: var(--amber);
+      }
+      .evaluating i,
+      .spin {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+        border-right-color: transparent;
+        animation: spin 0.9s linear infinite;
+        display: inline-block;
+      }
+      .see {
+        align-items: center;
+        gap: var(--s2);
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: var(--bg);
+        font-weight: 700;
+        font-size: 12.5px;
+        transition: transform 0.2s var(--ease), box-shadow 0.2s;
+      }
+      .see:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 30px rgba(242, 180, 105, 0.35);
+      }
+
+      /* ---- stage ---- */
+      .stage {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.85fr);
+        gap: var(--s6);
+        padding: var(--s5) var(--s6) var(--s4) 88px;
+        transition: padding 0.45s var(--ease);
+      }
+      body.side-open .stage {
+        padding-right: 356px;
+      }
+      .script {
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: var(--s4);
+        scrollbar-width: none;
+        padding: var(--s2) 0;
+      }
+      body.locked .script {
+        justify-content: flex-start;
+      }
+      .line {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: clamp(42px, 4.6vw, 70px);
+        line-height: 1.02;
+        letter-spacing: -0.025em;
+        text-wrap: balance;
+      }
+      .line.long {
+        font-size: clamp(36px, 3.6vw, 56px);
+      }
+      .why {
+        font-family: var(--serif);
+        font-style: italic;
+        font-weight: 300;
+        font-size: clamp(18px, 1.6vw, 22px);
+        line-height: 1.4;
+        color: var(--ink-2);
+        max-width: 34em;
+        text-wrap: pretty;
+      }
+      .why.quote::before {
+        content: '\201C';
+      }
+      .why.quote::after {
+        content: '\201D';
+      }
+      .enter {
+        animation: enter 0.6s var(--ease) both;
+      }
+      .enter-2 {
+        animation: enter 0.7s var(--ease) 0.08s both;
+      }
+      .enter-3 {
+        animation: enter 0.7s var(--ease) 0.16s both;
+      }
+      .who-line {
+        display: flex;
+        align-items: center;
+        gap: var(--s3);
+        flex-wrap: wrap;
+      }
+      .who-line .name {
+        font-family: var(--serif);
+        font-size: 19px;
+      }
+      .dotsep {
+        color: var(--ink-3);
+      }
+      .lock {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--s2);
+        margin-top: var(--s2);
+        align-self: flex-start;
+        padding: 9px 16px;
+        border: 1px solid var(--ink-4);
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--ink-2);
+        transition: all 0.25s var(--ease);
+      }
+      .lock:hover {
+        color: var(--bg);
+        background: var(--warm);
+        border-color: var(--warm);
+      }
+
+      /* cards (persona + failure) */
+      .cards {
+        display: flex;
+        gap: var(--s3);
+        flex-wrap: wrap;
+        margin-bottom: var(--s3);
+      }
+      .card {
+        flex: 1 1 260px;
+        max-width: 380px;
+        padding: var(--s4);
+        border-radius: 14px;
+        background: rgba(241, 235, 226, 0.04);
+        border: 1px solid var(--rule);
+        backdrop-filter: blur(6px);
+      }
+      .card .row {
+        display: flex;
+        align-items: center;
+        gap: var(--s3);
+      }
+      .card h3 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 19px;
+        line-height: 1.15;
+      }
+      .card .sub {
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .pill {
+        margin-left: auto;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--warm-2);
+        color: var(--warm);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: var(--s3);
+      }
+      .chip {
+        font-size: 11px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--ink-4);
+        color: var(--ink-2);
+      }
+      .chip.none {
+        border-style: dashed;
+        color: var(--ink-3);
+      }
+      .card.failure {
+        border-color: rgba(232, 115, 92, 0.35);
+        background: linear-gradient(160deg, rgba(232, 115, 92, 0.12), rgba(232, 115, 92, 0.03));
+      }
+      .card.failure .eyebrow {
+        color: var(--red);
+      }
+      .card.failure p {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--ink-2);
+      }
+
+      /* change mode */
+      .tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid currentColor;
+      }
+      .tag.hardware {
+        color: var(--hw);
+      }
+      .tag.firmware {
+        color: var(--fw);
+      }
+      .tag.interaction {
+        color: var(--ix);
+      }
+      .ba {
+        display: flex;
+        align-items: baseline;
+        gap: var(--s4);
+        margin-top: var(--s2);
+      }
+      .ba button {
+        font-family: var(--serif);
+        font-size: 40px;
+        font-weight: 300;
+        letter-spacing: -0.02em;
+        color: var(--ink-3);
+        position: relative;
+        transition: color 0.35s var(--ease);
+      }
+      .ba button::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 2px;
+        height: 2px;
+        background: var(--warm);
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 0.45s var(--ease);
+      }
+      .ba button:hover {
+        color: var(--ink-2);
+      }
+      .ba button.on {
+        color: var(--ink);
+        font-style: italic;
+      }
+      .ba button.on::after {
+        transform: scaleX(1);
+      }
+      .ba span {
+        color: var(--ink-4);
+        font-family: var(--serif);
+        font-size: 32px;
+      }
+      .change-code {
+        color: var(--warm);
+        opacity: 0.85;
+      }
+      .evidence {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s2) var(--s4);
+        font-size: 12.5px;
+        color: var(--ink-3);
+      }
+      .evidence button {
+        color: var(--ink-2);
+        border-bottom: 1px solid var(--ink-4);
+        transition: color 0.2s, border-color 0.2s;
+      }
+      .evidence button:hover {
+        color: var(--warm);
+        border-color: var(--warm);
+      }
+      .evidence sup {
+        font-variant-numeric: tabular-nums;
+        color: var(--warm);
+        margin-left: 2px;
+      }
+
+      /* viewport */
+      .viewport {
+        position: relative;
+        min-height: 0;
+        border-radius: 22px;
+        overflow: hidden;
+        cursor: grab;
+        user-select: none;
+        background: radial-gradient(ellipse 70% 60% at 50% 38%, rgba(242, 180, 105, 0.13), transparent 70%), linear-gradient(#1a1714, #110f0d);
+        box-shadow: inset 0 0 0 1px var(--rule), inset 0 0 120px rgba(0, 0, 0, 0.6);
+      }
+      .viewport.dragging {
+        cursor: grabbing;
+      }
+      .floor {
+        position: absolute;
+        left: -40%;
+        right: -40%;
+        bottom: -30%;
+        height: 70%;
+        transform: perspective(500px) rotateX(68deg);
+        transform-origin: 50% 0;
+        background:
+          repeating-linear-gradient(0deg, transparent 0 39px, rgba(241, 235, 226, 0.07) 39px 40px),
+          repeating-linear-gradient(90deg, transparent 0 39px, rgba(241, 235, 226, 0.07) 39px 40px);
+        mask-image: radial-gradient(ellipse 50% 70% at 50% 10%, #000, transparent 75%);
+        -webkit-mask-image: radial-gradient(ellipse 50% 70% at 50% 10%, #000, transparent 75%);
+      }
+      .shadow {
+        position: absolute;
+        left: 50%;
+        bottom: 10%;
+        width: 44%;
+        height: 26px;
+        transform: translateX(-50%);
+        border-radius: 50%;
+        background: radial-gradient(ellipse, rgba(0, 0, 0, 0.75), transparent 70%);
+        filter: blur(4px);
+      }
+      .rig {
+        position: absolute;
+        left: 50%;
+        top: 8%;
+        height: 76%;
+        aspect-ratio: 180 / 320;
+        translate: -50% 0;
+        transform-style: preserve-3d;
+        transition: transform 0.7s var(--ease);
+        filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.55));
+      }
+      .rig svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .rig.swap {
+        animation: swap 0.6s var(--ease);
+      }
+      .rig .key,
+      .rig .screen text,
+      .rig .fx {
+        transition: transform 0.7s var(--ease), opacity 0.5s var(--ease);
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .rig .fx {
+        opacity: 0;
+      }
+      .rig .key rect {
+        transition: fill 0.25s;
+      }
+      .rig .key.pressed rect {
+        fill: var(--warm);
+      }
+      .rig .key.pressed text {
+        fill: #141210;
+      }
+      .viewport.after-move_button .key-select {
+        transform: translateY(16px);
+      }
+      .viewport.after-resize_text .screen text {
+        transform: scale(1.5);
+      }
+      .viewport.after-confirm_dialog .fx-dialog,
+      .viewport.after-change_timeout .fx-timeout,
+      .viewport.after-add_audio_cue .fx-audio {
+        opacity: 1;
+      }
+      .vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at 50% 45%, transparent 50%, rgba(0, 0, 0, 0.55));
+      }
+      .vp-hint {
+        position: absolute;
+        left: var(--s4);
+        bottom: var(--s3);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+      .vp-tag {
+        position: absolute;
+        left: var(--s4);
+        top: var(--s3);
+        font-family: var(--serif);
+        font-style: italic;
+        color: var(--ink-3);
+      }
+      .countdown {
+        position: absolute;
+        right: var(--s3);
+        top: var(--s3);
+        display: flex;
+        align-items: center;
+        gap: var(--s2);
+        font-size: 11px;
+        color: var(--ink-3);
+        padding: 4px 6px 4px 10px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.35);
+      }
+      .countdown svg {
+        width: 22px;
+        height: 22px;
+        transform: rotate(-90deg);
+      }
+      .countdown[hidden] {
+        display: none;
+      }
+      .monitor {
+        position: absolute;
+        right: var(--s3);
+        bottom: var(--s3);
+        width: 46%;
+        max-width: 230px;
+        padding: 5px 5px 0;
+        border-radius: 10px;
+        background: #0c0b0a;
+        box-shadow: 0 0 0 1px rgba(241, 235, 226, 0.12), 0 14px 30px rgba(0, 0, 0, 0.6);
+        animation: enter 0.6s var(--ease) 0.2s both;
+        cursor: default;
+      }
+      .monitor svg {
+        display: block;
+        width: 100%;
+        border-radius: 6px;
+      }
+      .monitor figcaption {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10.5px;
+        color: var(--ink-2);
+        padding: 6px 4px 7px;
+      }
+      .monitor figcaption i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: beacon 1.4s infinite;
+      }
+
+      /* transport */
+      .transport {
+        display: grid;
+        grid-template-columns: auto auto minmax(140px, 260px) minmax(0, 1fr);
+        align-items: center;
+        gap: var(--s4);
+        padding: var(--s2) var(--s6) var(--s3) 88px;
+        transition: padding 0.45s var(--ease);
+        animation: enter 0.5s var(--ease) both;
+      }
+      body.side-open .transport {
+        padding-right: 356px;
+      }
+      .transport[hidden] {
+        display: none;
+      }
+      .play {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--ink);
+        color: var(--bg);
+        transition: transform 0.2s var(--ease), background 0.2s;
+      }
+      .play:hover {
+        transform: scale(1.07);
+        background: var(--warm);
+      }
+      .pos {
+        font-size: 12px;
+        color: var(--ink-2);
+        min-width: 52px;
+      }
+      .transport input[type='range'] {
+        width: 100%;
+        accent-color: var(--warm);
+        cursor: pointer;
+      }
+      .steps {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+        padding: 2px 24px;
+      }
+      .steps button {
+        flex-shrink: 0;
+        font-size: 11.5px;
+        padding: 5px 11px;
+        border-radius: 999px;
+        border: 1px solid var(--ink-4);
+        color: var(--ink-3);
+        white-space: nowrap;
+        transition: all 0.25s var(--ease);
+      }
+      .steps button sup {
+        font-size: 8.5px;
+        margin-right: 5px;
+        opacity: 0.7;
+      }
+      .steps button.done {
+        color: var(--ink-2);
+        background: rgba(241, 235, 226, 0.07);
+        border-color: transparent;
+      }
+      .steps button.next {
+        color: var(--bg);
+        background: var(--warm);
+        border-color: var(--warm);
+      }
+      .steps button:hover {
+        border-color: var(--ink-3);
+        color: var(--ink);
+      }
+      .steps button.next:hover {
+        color: var(--bg);
+      }
+
+      /* ---- cast strip ---- */
+      .cast {
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        gap: var(--s3);
+        padding: var(--s3) 88px var(--s4);
+        border-top: 1px solid var(--rule);
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.25));
+      }
+      .actor {
+        display: grid;
+        grid-template-columns: 60px minmax(0, 1fr);
+        align-items: center;
+        gap: var(--s3);
+        width: 220px;
+        padding: var(--s2) var(--s3) var(--s2) var(--s2);
+        border-radius: 16px;
+        border: 1px solid transparent;
+        transition: background 0.35s var(--ease), border-color 0.35s, transform 0.35s var(--ease), opacity 0.35s;
+        opacity: 0.72;
+      }
+      .actor:hover {
+        opacity: 1;
+        background: rgba(241, 235, 226, 0.04);
+        transform: translateY(-2px);
+      }
+      .actor.on {
+        opacity: 1;
+        background: linear-gradient(180deg, rgba(242, 180, 105, 0.14), rgba(242, 180, 105, 0.03));
+        border-color: rgba(242, 180, 105, 0.3);
+        transform: translateY(-3px);
+      }
+      .ring {
+        position: relative;
+        width: 60px;
+        height: 60px;
+      }
+      .ring svg {
+        width: 60px;
+        height: 60px;
+        transform: rotate(-90deg);
+      }
+      .ring .init {
+        position: absolute;
+        inset: 9px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-family: var(--serif);
+        font-size: 20px;
+        background: radial-gradient(circle at 35% 30%, #3a332c, #1f1b17);
+        transition: box-shadow 0.35s;
+      }
+      .actor.on .ring .init {
+        box-shadow: 0 0 22px rgba(242, 180, 105, 0.45);
+      }
+      .seg-a {
+        animation: breathe 1.6s ease-in-out infinite;
+      }
+      body[data-state='completed'] .seg-a {
+        animation: none;
+      }
+      .actor .txt {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .actor .nm {
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .actor .tk {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--ink-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .actor .tk .spin {
+        width: 9px;
+        height: 9px;
+        color: var(--warm);
+        flex-shrink: 0;
+      }
+      body[data-state='completed'] .actor .tk .spin {
+        display: none;
+      }
+      .actor .sc {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .actor .sc .p {
+        color: var(--green);
+      }
+      .actor .sc .f {
+        color: var(--red);
+      }
+
+      /* ---- drawers ---- */
+      .edge-tab {
+        position: absolute;
+        top: 50%;
+        z-index: 20;
+        writing-mode: vertical-rl;
+        padding: 18px 9px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        background: var(--bg-2);
+        border: 1px solid var(--rule);
+        transition: color 0.2s, background 0.2s, transform 0.45s var(--ease);
+      }
+      .edge-tab:hover {
+        color: var(--ink);
+        background: #25211c;
+      }
+      .edge-tab b {
+        color: var(--warm);
+        font-variant-numeric: tabular-nums;
+        margin-top: 8px;
+      }
+      .edge-tab.left {
+        left: 0;
+        transform: translateY(-50%) rotate(180deg);
+        border-radius: 0 10px 10px 0;
+        border-left: 0;
+      }
+      .edge-tab.right {
+        right: 0;
+        transform: translateY(-50%);
+        border-radius: 10px 0 0 10px;
+        border-right: 0;
+      }
+      body.side-open .edge-tab.right {
+        transform: translateY(-50%) translateX(-340px);
+      }
+      .edge-tab.right[hidden] {
+        display: none;
+      }
+      .drawer {
+        position: absolute;
+        top: 60px;
+        bottom: 0;
+        z-index: 15;
+        width: 400px;
+        max-width: 90vw;
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.45s var(--ease), box-shadow 0.45s;
+      }
+      .drawer.left {
+        left: 0;
+        transform: translateX(-102%);
+        border-left: 0;
+      }
+      .drawer.left.open {
+        transform: none;
+        box-shadow: 30px 0 80px rgba(0, 0, 0, 0.55);
+      }
+      .drawer.right {
+        right: 0;
+        width: 340px;
+        bottom: 0;
+        transform: translateX(102%);
+        border-right: 0;
+        z-index: 10;
+      }
+      body.side-open .drawer.right {
+        transform: none;
+      }
+      .drawer-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: var(--s5) var(--s5) var(--s3);
+      }
+      .drawer-head h2 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 26px;
+      }
+      .drawer-head .x {
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .drawer-head .x:hover {
+        color: var(--ink);
+      }
+      .drawer-body {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0 var(--s4) var(--s5);
+        scrollbar-width: thin;
+        scrollbar-color: var(--ink-4) transparent;
+      }
+      .item {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: var(--s3);
+        padding: 10px var(--s2);
+        border-radius: 10px;
+        transition: background 0.2s;
+      }
+      .item:hover:not(:disabled) {
+        background: rgba(241, 235, 226, 0.05);
+      }
+      .item.on {
+        background: rgba(242, 180, 105, 0.12);
+      }
+      .item .t {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .item.on .t {
+        color: var(--warm);
+      }
+      .item .n {
+        font-family: var(--serif);
+        font-style: italic;
+        color: var(--ink-3);
+        font-size: 15px;
+      }
+      .item .r {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+      .item.cta .t {
+        color: var(--warm);
+        font-weight: 600;
+      }
+      .st {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+        color: var(--ink-3);
+      }
+      .st::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+      }
+      .st.done,
+      .st.passed {
+        color: var(--green);
+      }
+      .st.failed {
+        color: var(--red);
+      }
+      .st.errored {
+        color: var(--amber);
+      }
+      .st.active {
+        color: var(--warm);
+      }
+      .st.done::before,
+      .st.passed::before,
+      .st.failed::before,
+      .st.errored::before {
+        background: currentColor;
+      }
+      .st.active::before {
+        border-right-color: transparent;
+        animation: spin 0.9s linear infinite;
+      }
+      body[data-state='completed'] .st.active::before {
+        animation: none;
+      }
+      .only-evaluating,
+      .only-completed {
+        display: none;
+      }
+      body[data-state='evaluating'] .only-evaluating,
+      body[data-state='completed'] .only-completed {
+        display: block;
+      }
+      .brief {
+        margin: var(--s3) var(--s2) 0;
+        padding-top: var(--s4);
+        border-top: 1px solid var(--rule);
+        animation: enter 0.45s var(--ease) both;
+      }
+      .brief h3 {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 24px;
+        line-height: 1.15;
+        margin: 6px 0 var(--s3);
+      }
+      .brief blockquote {
+        font-family: var(--serif);
+        font-style: italic;
+        font-weight: 300;
+        font-size: 15.5px;
+        color: var(--ink-2);
+        padding-left: var(--s3);
+        border-left: 2px solid var(--warm);
+        margin-bottom: var(--s4);
+      }
+      .brief dl {
+        display: grid;
+        grid-template-columns: 72px 1fr;
+        gap: var(--s2) var(--s3);
+        font-size: 13px;
+        color: var(--ink-2);
+        margin-bottom: var(--s4);
+      }
+      .brief dt {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        padding-top: 2px;
+      }
+      .brief code {
+        color: var(--warm);
+        word-break: break-word;
+      }
+      .mini {
+        display: inline-grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-family: var(--serif);
+        font-size: 13px;
+        background: #2c2620;
+      }
+      .side-title {
+        font-family: var(--serif);
+        font-weight: 400;
+        font-size: 22px;
+      }
+
+      @keyframes enter {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+          filter: blur(4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+          filter: none;
+        }
+      }
+      @keyframes swap {
+        0% {
+          opacity: 0.2;
+          scale: 0.96;
+        }
+        100% {
+          opacity: 1;
+          scale: 1;
+        }
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes beacon {
+        70% {
+          box-shadow: 0 0 0 7px rgba(242, 180, 105, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(242, 180, 105, 0);
+        }
+      }
+      @keyframes breathe {
+        50% {
+          opacity: 0.35;
+        }
+      }
+      @media (max-width: 1280px) {
+        .actor {
+          width: 190px;
+          grid-template-columns: 52px minmax(0, 1fr);
+        }
+        .ring,
+        .ring svg {
+          width: 52px;
+          height: 52px;
+        }
+        .ring .init {
+          inset: 8px;
+          font-size: 17px;
+        }
+        body.side-open .stage,
+        body.side-open .transport {
+          padding-right: 340px;
+        }
+        .stage {
+          grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.85fr);
+          gap: var(--s5);
+        }
+        .meta .opt {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <main class="theater" id="theater">
+      <div class="spot" id="spot"></div>
+
+      <header class="bar">
+        <span class="brand">Infallible</span>
+        <div class="meta">
+          <span>Run <b><code id="run-id"></code></b></span>
+          <span>Started <b class="num" id="run-started"></b></span>
+          <span class="opt num" id="run-counts"></span>
+        </div>
+        <span class="spacer"></span>
+        <span class="mode" id="mode"></span>
+        <span class="evaluating"><i></i>Evaluating</span>
+        <button class="see" id="see">See suggestions <span class="num" id="see-n"></span> &rarr;</button>
+        <span class="state"><i></i><span id="run-state"></span></span>
+        <button class="back" id="back">&larr; Leave stage <span style="opacity:.5">Esc</span></button>
+      </header>
+
+      <section class="stage" id="stage" aria-live="polite">
+        <div class="script" id="script"></div>
+        <div class="viewport" id="viewport">
+          <div class="floor"></div>
+          <div class="shadow"></div>
+          <div class="rig" id="rig"></div>
+          <div class="vignette"></div>
+          <span class="vp-tag" id="vp-tag"></span>
+          <span class="vp-hint">Drag to orbit · scroll to zoom</span>
+          <div class="countdown" id="countdown" hidden>
+            <span id="cd-label">next</span>
+            <svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" fill="none" stroke="rgba(241,235,226,.15)" stroke-width="2.5" /><circle id="cd-arc" cx="11" cy="11" r="8" fill="none" stroke="#f2b469" stroke-width="2.5" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" /></svg>
+          </div>
+          <div id="monitor-slot"></div>
+        </div>
+      </section>
+
+      <footer class="transport" id="transport" hidden>
+        <button class="play" id="play" aria-label="Play or pause">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path id="play-icon" d="M5 3.5v9M11 3.5v9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg>
+        </button>
+        <span class="pos num" id="pos"></span>
+        <input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub steps" />
+        <ol class="steps" id="steps"></ol>
+      </footer>
+
+      <nav class="cast" id="cast" aria-label="Personas"></nav>
+
+      <button class="edge-tab left" id="tasks-tab" aria-controls="tasks-drawer">Tasks <b id="tasks-tab-n"></b></button>
+      <aside class="drawer left" id="tasks-drawer" aria-label="Tasks">
+        <div class="drawer-head"><h2>Tasks</h2><button class="x" id="tasks-close">Close &times;</button></div>
+        <div class="drawer-body" id="tasks-body"></div>
+      </aside>
+
+      <button class="edge-tab right" id="side-tab" hidden></button>
+      <aside class="drawer right" id="side" aria-label="Side drawer">
+        <div class="drawer-head"><h2 class="side-title" id="side-title"></h2><span class="eyebrow num" id="side-n"></span></div>
+        <div class="drawer-body" id="side-body"></div>
+      </aside>
+    </main>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const ROTATE_MS = 4000;
+      const state = () => document.body.dataset.state;
+
+      let sb = null; // { kind, agentId, taskId, suggestionId }
+      let spotId = M.agents[0].id;
+      let elapsed = 0;
+      let hover = false;
+      let drawerOpen = false;
+      let selectedTask = null;
+      let sideOpen = true;
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+      let flipTimer = null;
+
+      const working = () => M.agents.filter((a) => a.status === 'working');
+      const rotating = () => !sb && state() !== 'completed' && !reduced;
+      const outcomeOf = (a, tid) => a.outcomes[tid] || (a.currentTaskId === tid ? 'active' : 'pending');
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((a) => a === 'press select')) return 'basal';
+        if (seen.some((a) => a.startsWith('hold up') || a === 'press up')) return 'bolus';
+        if (seen.some((a) => a === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+      const pressedOf = (step) => {
+        const m = step && step.action.match(/^(press|hold) (\w+)/);
+        return m ? m[2] : null;
+      };
+      function setPump(screen, pressed, swap) {
+        const rig = $('#rig');
+        if (rig.dataset.screen !== screen || !rig.firstChild) {
+          rig.dataset.screen = screen;
+          rig.innerHTML = M.pumpSvg({ screen, pressed });
+        }
+        rig.querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', k.dataset.button === pressed));
+        if (swap) {
+          rig.classList.remove('swap');
+          void rig.offsetWidth;
+          rig.classList.add('swap');
+        }
+      }
+
+      /* ---- header ---- */
+      function renderHeader() {
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-started').textContent = M.run.startedAt;
+        $('#run-state').textContent = state();
+        const pass = M.agents.reduce((n, a) => n + a.passed, 0);
+        const fail = M.agents.reduce((n, a) => n + a.failed + a.errored, 0);
+        $('#run-counts').textContent = `${M.agents.length} personas · ${M.tasks.length} tasks · ${pass} passed · ${fail} failed`;
+        $('#see-n').textContent = `(${M.suggestions.length})`;
+        $('#mode').textContent = !sb ? (rotating() ? 'Now playing' : 'Curtain call') : sb.kind === 'change' ? 'Proposed change' : sb.kind === 'live' ? 'Spotlight locked · live' : 'Spotlight locked · replay';
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#tasks-tab-n').textContent = `${done}/${M.tasks.length}`;
+      }
+
+      /* ---- cast ---- */
+      function ringSvg(a) {
+        const n = M.tasks.length;
+        const gap = 3;
+        const seg = 100 / n;
+        return (
+          `<svg viewBox="0 0 60 60">` +
+          M.tasks
+            .map((t, i) => {
+              const o = outcomeOf(a, t.id);
+              const col = o === 'passed' ? 'var(--green)' : o === 'failed' || o === 'errored' ? 'var(--red)' : o === 'active' ? 'var(--warm)' : 'rgba(241,235,226,.12)';
+              return `<circle class="${o === 'active' ? 'seg-a' : ''}" cx="30" cy="30" r="27" fill="none" stroke="${col}" stroke-width="3" pathLength="100" stroke-dasharray="${seg - gap} ${100 - seg + gap}" stroke-dashoffset="${-(i * seg)}"/>`;
+            })
+            .join('') +
+          `</svg>`
+        );
+      }
+      function renderCast() {
+        const focus = sb && sb.agentId ? sb.agentId : !sb ? spotId : null;
+        $('#cast').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const t = M.taskById[a.currentTaskId];
+            const done = state() === 'completed';
+            const tk = done ? 'done' : a.status === 'error' ? esc(a.lastError || 'error') : `<span class="spin"></span>${esc(t ? t.short : a.status)}`;
+            return `<button class="actor ${a.id === focus ? 'on' : ''}" data-agent="${a.id}" aria-label="Open ${esc(p.name)}">
+              <span class="ring">${ringSvg(a)}<span class="init">${esc(p.name[0])}</span></span>
+              <span class="txt"><span class="nm">${esc(p.name)} <span style="color:var(--ink-3);font-weight:400">${p.age}</span></span>
+              <span class="tk">${tk}</span>
+              <span class="sc num"><span class="p">${a.passed} pass</span> · <span class="f">${a.failed + a.errored} fail</span></span></span></button>`;
+          })
+          .join('');
+        $('#cast').querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, null)));
+      }
+
+      /* ---- tasks drawer ---- */
+      function renderTasks() {
+        const t = M.taskById[selectedTask];
+        let html =
+          `<ul>` +
+          M.tasks
+            .map(
+              (x, i) => `<li><button class="item ${x.id === selectedTask ? 'on' : ''}" data-task="${x.id}"><span class="n num">${i + 1}</span><span class="t">${esc(x.name)}</span><span class="st ${M.taskStatus(x.id)}">${M.taskStatus(x.id)}</span></button></li>`,
+            )
+            .join('') +
+          `<li class="only-evaluating"><div class="item"><span class="evaluating" style="display:inline-flex"><i></i></span><span class="t" style="color:var(--amber)">Evaluating outcomes</span></div></li>` +
+          `<li class="only-completed"><button class="item cta" data-open-change><span class="n">&rarr;</span><span class="t">See suggestions</span><span class="r num">${M.suggestions.length}</span></button></li></ul>`;
+        if (t) {
+          const i = M.tasks.indexOf(t);
+          html += `<div class="brief">
+            <span class="eyebrow">Task ${i + 1} of ${M.tasks.length}</span>
+            <h3>${esc(t.name)}</h3>
+            <blockquote>&ldquo;${esc(t.description)}&rdquo;</blockquote>
+            <dl><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Success</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd class="num">${t.maxSteps}</dd></dl>
+            <span class="eyebrow">Outcomes</span>
+            <ul style="margin-top:6px">${M.agents
+              .map((a) => {
+                const p = M.personaOf(a);
+                const st = outcomeOf(a, t.id);
+                const n = M.historyOf(a.id, t.id).length;
+                return `<li><button class="item" data-agent="${a.id}" ${st === 'pending' ? 'disabled' : ''}><span class="mini">${esc(p.name[0])}</span><span class="t">${esc(p.name)} <span class="r num">${n ? n + ' steps' : ''}</span></span><span class="st ${st}">${st}</span></button></li>`;
+              })
+              .join('')}</ul></div>`;
+        }
+        $('#tasks-body').innerHTML = html;
+        $('#tasks-body').querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => {
+            selectedTask = b.dataset.task === selectedTask ? null : b.dataset.task;
+            renderTasks();
+          }),
+        );
+        $('#tasks-body').querySelectorAll('[data-agent]').forEach((b) =>
+          b.addEventListener('click', () => {
+            setDrawer(false);
+            openAgent(b.dataset.agent, t.id);
+          }),
+        );
+        const ch = $('#tasks-body [data-open-change]');
+        if (ch) ch.addEventListener('click', () => (setDrawer(false), openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id })));
+      }
+      function setDrawer(open) {
+        drawerOpen = open;
+        $('#tasks-drawer').classList.toggle('open', open);
+        $('#tasks-tab').setAttribute('aria-expanded', open);
+      }
+      $('#tasks-tab').addEventListener('click', () => setDrawer(!drawerOpen));
+      $('#tasks-close').addEventListener('click', () => setDrawer(false));
+
+      /* ---- dashboard spotlight ---- */
+      function renderSpotlight(fresh) {
+        const a = M.agentById[spotId];
+        const p = M.personaOf(a);
+        const t = M.taskById[a.currentTaskId];
+        const steps = M.historyOf(a.id, a.currentTaskId);
+        const cur = steps[steps.length - 1];
+        const done = state() === 'completed';
+        $('#script').innerHTML = `
+          <div class="who-line eyebrow enter"><span>${done ? 'Final take' : 'On stage'}</span><span class="dotsep">/</span><span class="num">Step ${steps.length}</span><span class="dotsep">/</span><span>${esc(t ? t.short : '')}</span></div>
+          <div class="who-line enter"><span class="mini">${esc(p.name[0])}</span><span class="name">${esc(p.name)}</span><span style="color:var(--ink-3)">${p.age}${p.modifiers.length ? ' · ' + p.modifiers.map((m) => esc(m.label)).join(', ') : ''}</span></div>
+          <h1 class="line enter-2">${cur ? esc(cur.action) : 'waiting'}</h1>
+          ${cur ? `<p class="why quote enter-3">${esc(cur.reasoning)}</p>` : ''}
+          <button class="lock enter-3" id="lock">Lock spotlight on ${esc(p.name.split(' ')[0])} &rarr;</button>`;
+        $('#lock').addEventListener('click', () => openAgent(a.id, null));
+        $('#vp-tag').textContent = `${p.name} · ${screenFor(steps.length, steps, t)} screen`;
+        $('#spot').style.setProperty('--sx', `${30 + M.agents.indexOf(a) * 6}%`);
+        setPump(screenFor(steps.length, steps, t), pressedOf(cur), fresh);
+        $('#monitor-slot').innerHTML = '';
+        $('#viewport').className = 'viewport';
+      }
+      function nextSpot() {
+        const w = working();
+        if (!w.length) return;
+        const i = w.findIndex((a) => a.id === spotId);
+        spotId = w[(i + 1) % w.length].id;
+        elapsed = 0;
+        renderSpotlight(true);
+        renderCast();
+      }
+      function updateCountdown() {
+        const cd = $('#countdown');
+        cd.hidden = !rotating();
+        const held = hover || drawerOpen;
+        $('#cd-label').textContent = held ? 'held' : `next ${Math.ceil((ROTATE_MS - elapsed) / 1000)}s`;
+        $('#cd-arc').setAttribute('stroke-dashoffset', 100 - (elapsed / ROTATE_MS) * 100);
+      }
+      setInterval(() => {
+        if (!rotating()) return;
+        if (!hover && !drawerOpen) {
+          elapsed += 100;
+          if (elapsed >= ROTATE_MS) nextSpot();
+        }
+        updateCountdown();
+      }, 100);
+      $('#stage').addEventListener('mouseenter', () => ((hover = true), updateCountdown()));
+      $('#stage').addEventListener('mouseleave', () => ((hover = false), updateCountdown()));
+
+      function render() {
+        document.body.classList.toggle('locked', !!sb);
+        document.body.classList.toggle('side-open', !!sb && sideOpen);
+        renderHeader();
+        renderCast();
+        renderTasks();
+        if (!sb) {
+          $('#transport').hidden = true;
+          $('#side-tab').hidden = true;
+          renderSpotlight(false);
+        } else renderSandbox();
+        updateCountdown();
+      }
+
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (state() === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId)) return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+        openSandbox({ kind: 'replay', agentId, taskId: target });
+      }
+
+      /* ---- sandbox (locked stage) ---- */
+      function openSandbox(mode) {
+        sb = mode;
+        after = false;
+        clearTimeout(flipTimer);
+        clearInterval(replay.timer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#rig').dataset.screen = '';
+        render();
+        if (mode.kind === 'replay') startReplay();
+      }
+      function closeSandbox() {
+        clearInterval(replay.timer);
+        clearTimeout(flipTimer);
+        if (sb && sb.agentId) spotId = sb.agentId;
+        sb = null;
+        elapsed = 0;
+        $('#rig').dataset.screen = '';
+        render();
+      }
+      $('#back').addEventListener('click', closeSandbox);
+      $('#see').addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (drawerOpen) return setDrawer(false);
+        if (sb) closeSandbox();
+      });
+      $('#side-tab').addEventListener('click', () => {
+        sideOpen = !sideOpen;
+        document.body.classList.toggle('side-open', sideOpen);
+      });
+
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+
+      function renderSandbox() {
+        const side = $('#side-body');
+        const tab = $('#side-tab');
+        tab.hidden = false;
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#viewport').className = 'viewport';
+        $('#monitor-slot').innerHTML = '';
+
+        if (sb.kind === 'change') {
+          const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+          const i = M.suggestions.indexOf(s);
+          tab.innerHTML = `Suggestions <b>${M.suggestions.length}</b>`;
+          $('#side-title').textContent = 'Suggestions';
+          $('#side-n').textContent = `${i + 1} / ${M.suggestions.length}`;
+          $('#vp-tag').textContent = `Proposal ${i + 1} · ${s.change.type}`;
+          $('#script').innerHTML = `
+            <div class="who-line enter"><span class="tag ${s.category}">${s.category}</span><span class="eyebrow num">Suggestion ${i + 1} of ${M.suggestions.length}</span></div>
+            <h1 class="line long enter-2">${esc(s.title)}</h1>
+            <p class="why enter-3">${esc(s.rationale)}</p>
+            <div class="evidence enter-3"><span>Evidence</span>${s.evidence
+              .map((e) => `<button data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}">${esc(M.personaOf(M.agentById[e.agentId]).name)} · ${esc(M.taskById[e.taskId].short)}<sup>§${e.step}</sup></button>`)
+              .join('')}</div>
+            <div class="ba enter-3" role="group" aria-label="Before or after"><button data-after="0" class="on">Before</button><span>/</span><button data-after="1">After</button></div>
+            <code class="change-code enter-3">${s.change.type}(${esc(JSON.stringify(s.change.params).replace(/[{}"]/g, '').replace(/,/g, ', '))})</code>`;
+          setPump('bolus', null, true);
+          injectFx();
+          $('#script').querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(s, b.dataset.after === '1')));
+          $('#script').querySelectorAll('[data-ev-agent]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evAgent, taskId: b.dataset.evTask })));
+          side.innerHTML = `<ul>${M.suggestions
+            .map(
+              (x, j) =>
+                `<li><button class="item ${x.id === s.id ? 'on' : ''}" data-sug="${x.id}" style="grid-template-columns:24px minmax(0,1fr);align-items:start"><span class="n num">${j + 1}</span><span style="min-width:0;display:flex;flex-direction:column;gap:6px"><span class="t" style="white-space:normal">${esc(x.title)}</span><span><span class="tag ${x.category}">${x.category}</span></span></span></button></li>`,
+            )
+            .join('')}</ul>`;
+          side.querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: b.dataset.sug })));
+          flipTimer = setTimeout(() => {
+            if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) setAfter(s, true);
+          }, 900);
+          return;
+        }
+
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const outcome = a.outcomes[sb.taskId];
+        const scored = Object.keys(a.outcomes).length;
+        tab.innerHTML = `Tasks <b>${scored}/${M.tasks.length}</b>`;
+        $('#side-title').textContent = `${p.name.split(' ')[0]}'s tasks`;
+        $('#side-n').textContent = `${scored} / ${M.tasks.length} scored`;
+        $('#vp-tag').textContent = `${p.name} · ${t ? t.short : ''}`;
+        $('#script').innerHTML = `
+          <div class="cards">
+            <div class="card enter">
+              <div class="row"><span class="mini" style="width:38px;height:38px;font-size:18px">${esc(p.name[0])}</span><div><h3>${esc(p.name)}</h3><span class="sub">${p.age}, ${esc(p.gender)}</span></div><span class="pill">${esc(a.status)}</span></div>
+              <div class="chips">${p.modifiers.length ? p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('') : '<span class="chip none">no modifiers</span>'}</div>
+            </div>
+            ${
+              outcome === 'failed' || outcome === 'errored'
+                ? `<div class="card failure enter-2"><span class="eyebrow">${outcome === 'errored' ? 'Errored' : 'Failed'} · ${esc(t.short)}</span><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>`
+                : ''
+            }
+          </div>
+          <div class="eyebrow" id="step-eyebrow"></div>
+          <h1 class="line" id="line"></h1>
+          <p class="why quote" id="why"></p>`;
+        side.innerHTML = `<ul>${M.tasks
+          .map((x, j) => {
+            const st = outcomeOf(a, x.id);
+            const live = st === 'active';
+            const has = M.historyOf(a.id, x.id).length > 0;
+            return `<li><button class="item ${x.id === sb.taskId ? 'on' : ''}" data-task="${x.id}" data-live="${live ? 1 : 0}" ${has ? '' : 'disabled'}><span class="n num">${j + 1}</span><span class="t">${esc(x.short)}</span><span class="st ${st}">${st}</span></button></li>`;
+          })
+          .join('')}</ul>`;
+        side.querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.task })),
+        );
+        if (sb.kind === 'replay') {
+          const steps = stepsFor();
+          $('#scrub').max = steps.length;
+          $('#steps').innerHTML = steps.map((s, j) => `<li><button data-i="${j}"><sup class="num">${j + 1}</sup>${esc(s.action)}</button></li>`).join('');
+          $('#steps').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+        }
+        renderStep(true);
+        if (sb.kind === 'replay') renderTransport();
+      }
+
+      function renderStep(first) {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        $('#step-eyebrow').textContent = `${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${t ? t.short : ''}`;
+        const line = $('#line');
+        line.textContent = cur ? cur.action : sb.kind === 'replay' ? 'curtain up' : 'waiting';
+        const why = $('#why');
+        why.textContent = cur ? cur.reasoning : '';
+        why.style.display = cur ? '' : 'none';
+        for (const [el, c] of [
+          [line, 'enter-2'],
+          [why, 'enter-3'],
+        ]) {
+          el.classList.remove(c);
+          void el.offsetWidth;
+          el.classList.add(c);
+        }
+        const screen = screenFor(shown, steps, t);
+        setPump(screen, pressedOf(cur), first);
+        if (sb.kind === 'live')
+          $('#monitor-slot').innerHTML = `<figure class="monitor">${M.frameSvg(a.personaId, { screen })}<figcaption><i></i>Persona view · heard confirmation beep</figcaption></figure>`;
+      }
+
+      /* replay transport */
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing || !sb || sb.kind !== 'replay') return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            return renderTransport();
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const ended = replay.cursor >= n;
+        const on = replay.playing && !ended;
+        $('#scrub').value = replay.cursor;
+        $('#pos').textContent = `${replay.cursor} / ${n}`;
+        $('#play-icon').setAttribute('d', on ? 'M5 3.5v9M11 3.5v9' : 'M5 3.5v9l7-4.5z');
+        $('#play-icon').setAttribute('fill', on ? 'none' : 'currentColor');
+        $('#play').setAttribute('aria-label', on ? 'Pause' : 'Play');
+        $('#steps')
+          .querySelectorAll('button')
+          .forEach((b, i) => {
+            b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+            if (i === Math.min(replay.cursor, n - 1)) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduced ? 'auto' : 'smooth' });
+          });
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      });
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      /* change mode fx */
+      function injectFx() {
+        $('#rig svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#f2b469"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#141210" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#f2b469" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+      function setAfter(s, on) {
+        after = on;
+        $('#script').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === on));
+        $('#viewport').className = 'viewport' + (on ? ' after-' + s.change.type : '');
+      }
+
+      /* cosmetic orbit */
+      (function orbit() {
+        const vp = $('#viewport');
+        const rig = $('#rig');
+        let drag = null;
+        let rx = -4;
+        let ry = -16;
+        let z = 1;
+        const apply = () => (rig.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => {
+          if (e.target.closest('.monitor')) return;
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          rig.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          drag = null;
+          vp.classList.remove('dragging');
+          rig.style.transition = '';
+        });
+        vp.addEventListener(
+          'wheel',
+          (e) => {
+            e.preventDefault();
+            z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+            apply();
+          },
+          { passive: false },
+        );
+      })();
+
+      /* mock controls */
+      document.addEventListener('mock:state', render);
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        setDrawer(false);
+        if (k === 'dashboard') return closeSandbox();
+        if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+        openSandbox({ kind: k, ...M.defaults[k] });
+      });
+
+      render();
+      M.mountControls();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Columns · Infallible design 12</title>
+    <style>
+      /* 12 · Columns — a Finder-style column browser: Run › group › item › sandbox, selection flows left to right. */
+      :root {
+        --page: #f5f6f8;
+        --panel: #fff;
+        --ink: #16181d;
+        --ink-2: #5b6170;
+        --ink-3: #9198a6;
+        --line: rgba(0, 0, 0, 0.1);
+        --hover: #f3f4f7;
+        --accent: #2f6fdf;
+        --tint: #eaf1fd;
+        --ok: #2f8a4c;
+        --bad: #c8463a;
+        --r: 6px;
+        --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font: 14px/1.5 var(--sans);
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, p, dl, dd, figure, blockquote { margin: 0; }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r); }
+      code { font-family: var(--mono); font-size: 12px; }
+      .num { font-variant-numeric: tabular-nums; }
+      .eyebrow { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+      .muted { color: var(--ink-2); }
+      .ic { width: 16px; height: 16px; flex: none; display: block; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+      .g.ok { color: var(--ok); }
+      .g.bad { color: var(--bad); }
+      .g.mute { color: var(--ink-3); }
+      .spin { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--accent); border-right-color: transparent; animation: spin 0.9s linear infinite; display: block; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: block; }
+
+      /* ---- frame ---- */
+      .app { height: 100%; display: grid; grid-template-rows: 64px 1fr; }
+      .top { display: flex; align-items: center; gap: 24px; padding: 0 40px; }
+      .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+      .brand svg { color: var(--accent); }
+      .crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; }
+      .crumbs .sep { color: var(--ink-3); }
+      .crumbs button { padding: 4px 8px; border-radius: var(--r); color: var(--ink-2); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+      .crumbs button:hover { background: #ebedf1; color: var(--ink); }
+      .crumbs [aria-current] { color: var(--ink); font-weight: 600; pointer-events: none; }
+      .top-r { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+      .state { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 600; }
+      .state .dot { background: var(--ink-3); }
+      body[data-state='running'] .state .dot { background: var(--accent); }
+      body[data-state='completed'] .state .dot { background: var(--ok); }
+      .see { padding: 4px 12px; border-radius: var(--r); background: var(--accent); color: #fff; font-weight: 600; font-size: 12px; }
+      .see:hover { background: #2760c6; }
+
+      main { min-height: 0; padding: 0 40px 32px; }
+      .browser {
+        height: 100%;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        overflow: hidden;
+      }
+      .col { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+      .col:first-child { border-left: 0; }
+      .col-head { flex: none; height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+      .col-head .meta { font-size: 12px; color: var(--ink-3); }
+      .col-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+      .col-body.enter { animation: enter 0.22s var(--ease) both; }
+      .hint { margin: auto; padding: 24px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+      /* ---- rows: glyph · title · meta ---- */
+      .list { padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+      .row {
+        width: 100%; min-height: 36px; display: flex; align-items: center; gap: 8px;
+        padding: 0 8px; border-radius: var(--r); transition: background 0.15s var(--ease);
+      }
+      .row.two { min-height: 52px; }
+      .row:hover:not(:disabled):not(.on) { background: var(--hover); }
+      .row.on { background: var(--tint); }
+      .row.on .tt { color: var(--accent); font-weight: 600; }
+      .row:disabled { opacity: 0.45; }
+      .row.static { cursor: default; color: var(--ink-2); }
+      .rg { width: 24px; flex: none; display: grid; place-items: center; color: var(--ink-2); }
+      .rt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      .tt, .ts { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ts { font-size: 12px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+      .ts .spin { width: 10px; height: 10px; }
+      body[data-state='completed'] .ts .spin { display: none; }
+      .rm { flex: none; font-size: 12px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+      .rc { flex: none; color: var(--ink-3); }
+      .row.on .rc { color: var(--accent); }
+      .avatar { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #eceef2; color: var(--ink-2); font-size: 12px; font-weight: 600; flex: none; }
+      .row.on .avatar { background: var(--accent); color: #fff; }
+      .avatar.lg { width: 40px; height: 40px; font-size: 14px; }
+      .score .p { color: var(--ok); }
+      .score .f { color: var(--bad); }
+      .cat { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+      .cat.hardware { background: #7a5bc7; }
+      .cat.firmware { background: #2a9aa8; }
+      .cat.interaction { background: #c98a1e; }
+      .sect { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+      /* run column */
+      .summary { margin-top: auto; padding: 16px; border-top: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 12px; }
+      .summary dt { color: var(--ink-3); }
+      .summary dd { text-align: right; font-variant-numeric: tabular-nums; }
+
+      /* detail column */
+      .pad { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+      .pad h2 { font-size: 18px; line-height: 1.3; font-weight: 600; }
+      .quote { color: var(--ink-2); padding-left: 16px; border-left: 2px solid var(--line); }
+      .facts { display: grid; grid-template-columns: 72px 1fr; gap: 8px 16px; }
+      .facts dt { font-size: 12px; color: var(--ink-3); padding-top: 2px; }
+      .facts code { display: block; padding: 8px; background: var(--page); border-radius: var(--r); word-break: break-word; }
+      .sec { display: flex; justify-content: space-between; align-items: center; padding: 16px 16px 0; border-top: 1px solid var(--line); }
+      .sec .meta { font-size: 12px; color: var(--ink-3); }
+      .card-who { display: flex; align-items: center; gap: 16px; }
+      .card-who .ts { font-size: 14px; }
+      .pill { margin-left: auto; font-size: 12px; padding: 0 8px; line-height: 24px; border-radius: var(--r); border: 1px solid var(--line); color: var(--ink-2); }
+      .pill.working { color: var(--accent); border-color: rgba(47, 111, 223, 0.3); }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip { font-size: 12px; padding: 0 8px; line-height: 24px; border-radius: var(--r); background: var(--page); color: var(--ink-2); }
+      .tag { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); text-transform: capitalize; }
+
+      /* ---- sandbox column ---- */
+      .sb { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .who { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+      .who .line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+      .who .tt { font-weight: 600; }
+      .who .pill { margin-left: auto; }
+      .tdots { margin-left: auto; display: flex; gap: 2px; }
+      .tdots button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--r); }
+      .tdots button:hover:not(:disabled) { background: var(--hover); }
+      .tdots button.on { background: var(--tint); }
+      .tdots button:disabled { opacity: 0.35; }
+      .viewport {
+        position: relative; flex: 1 1 58%; min-height: 200px; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; background: #fafbfc; cursor: grab; user-select: none; overflow: hidden;
+      }
+      .viewport.dragging { cursor: grabbing; }
+      .stage { height: 76%; aspect-ratio: 180 / 320; transition: transform 0.3s var(--ease); position: relative; z-index: 1; }
+      .stage svg { width: 100%; height: 100%; display: block; }
+      .ground { width: 38%; max-width: 160px; height: 10px; margin-top: 8px; border-radius: 50%; background: rgba(0, 0, 0, 0.1); box-shadow: 0 0 12px 6px rgba(0, 0, 0, 0.06); }
+      .stage .key, .stage .screen text, .stage .fx { transition: transform 0.3s var(--ease), opacity 0.3s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .stage .fx { opacity: 0; }
+      .stage .key.pressed rect { fill: var(--accent); }
+      .viewport.after-move_button .key-select { transform: translateY(16px); }
+      .viewport.after-resize_text .screen text { transform: scale(1.5); }
+      .viewport.after-confirm_dialog .fx-dialog,
+      .viewport.after-change_timeout .fx-timeout,
+      .viewport.after-add_audio_cue .fx-audio { opacity: 1; }
+      .vp-hint { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--ink-3); }
+      .sb-body { flex: 1 1 0; min-height: 120px; overflow-y: auto; border-top: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 16px; scrollbar-width: thin; }
+      .step { display: grid; grid-template-columns: 1fr; gap: 16px; }
+      .step.live { grid-template-columns: 1fr 120px; }
+      .action { font-size: 18px; font-weight: 600; line-height: 1.3; margin: 4px 0; animation: enter 0.2s var(--ease) both; }
+      .reason { color: var(--ink-2); }
+      .frame svg { display: block; width: 100%; border-radius: var(--r); }
+      .frame figcaption { font-size: 12px; color: var(--ink-3); margin-top: 4px; line-height: 1.3; }
+      .failure { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r); }
+      .failure .eyebrow { display: block; color: var(--bad); }
+      .transport { flex: none; height: 48px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-top: 1px solid var(--line); }
+      .play { width: 32px; height: 32px; border-radius: var(--r); display: grid; place-items: center; flex: none; color: var(--accent); }
+      .play:hover { background: var(--tint); }
+      .transport input { width: 80px; flex: none; accent-color: var(--accent); cursor: pointer; }
+      .pos { font-size: 12px; color: var(--ink-2); width: 40px; text-align: right; flex: none; }
+      .chips-x { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; position: relative; }
+      .chips-x button { flex: none; font-size: 12px; line-height: 24px; padding: 0 8px; border-radius: var(--r); border: 1px solid var(--line); color: var(--ink-3); white-space: nowrap; transition: background 0.15s, color 0.15s; }
+      .chips-x button.done { color: var(--ink-2); background: var(--page); border-color: transparent; }
+      .chips-x button.next { color: var(--accent); border-color: var(--accent); }
+      .chips-x button:hover { color: var(--ink); }
+      .ba { flex: none; display: flex; align-items: center; gap: 16px; padding: 16px; border-top: 1px solid var(--line); }
+      .seg { display: inline-flex; padding: 2px; background: var(--page); border-radius: var(--r); }
+      .seg button { padding: 0 16px; line-height: 28px; border-radius: 5px; font-size: 12px; font-weight: 600; color: var(--ink-2); transition: background 0.2s, color 0.2s; }
+      .seg button.on { background: var(--panel); color: var(--accent); box-shadow: 0 0 0 1px var(--line); }
+      .ba-cap { font-size: 12px; color: var(--ink-2); }
+
+      @media (max-width: 1199px) {
+        .top { padding: 0 32px; }
+        main { padding: 0 32px 32px; }
+        .browser { grid-template-columns: 1fr 1fr 1fr 1.5fr; }
+        .top-r .wide { display: none; }
+      }
+      @keyframes enter { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+        .spin { animation-duration: 2.4s !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          <svg class="ic" viewBox="0 0 16 16"><rect x="2" y="2" width="3" height="12" rx="1" /><rect x="6.5" y="2" width="3" height="12" rx="1" /><rect x="11" y="2" width="3" height="12" rx="1" /></svg>
+          Infallible
+        </div>
+        <nav class="crumbs" id="crumbs" aria-label="Selection path"></nav>
+        <div class="top-r" id="top-r"></div>
+      </header>
+      <main>
+        <div class="browser">
+          <section class="col"><div class="col-head" id="h1"></div><div class="col-body" id="c1"></div></section>
+          <section class="col"><div class="col-head" id="h2"></div><div class="col-body" id="c2"></div></section>
+          <section class="col"><div class="col-head" id="h3"></div><div class="col-body" id="c3"></div></section>
+          <section class="col"><div class="col-head" id="h4"></div><div class="col-body" id="c4"></div></section>
+        </div>
+      </main>
+    </div>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const ic = (d, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 16 16" aria-hidden="true">${d}</svg>`;
+      const I = {
+        tasks: '<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 8.5h6M5 11h3.5"/>',
+        personas: '<circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/>',
+        suggestions: '<path d="M6 12.5h4M6.5 14.5h3M8 1.8a4.2 4.2 0 0 0-2.5 7.6c.4.3.5.7.5 1.1v.5h4v-.5c0-.4.1-.8.5-1.1A4.2 4.2 0 0 0 8 1.8z"/>',
+        chev: '<path d="M6 4l4 4-4 4"/>',
+        play: '<path d="M5 3.5v9l7-4.5z" fill="currentColor"/>',
+        pause: '<path d="M5.5 3.5v9M10.5 3.5v9" stroke-width="2"/>',
+        warn: '<circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 10.8v.2"/>',
+      };
+      const state = () => document.body.dataset.state || 'running';
+      function glyph(st) {
+        if (st === 'passed' || st === 'done') return ic('<circle cx="8" cy="8" r="6"/><path d="M5.3 8.2l1.8 1.8 3.6-3.8"/>', 'g ok');
+        if (st === 'failed') return ic('<circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4"/>', 'g bad');
+        if (st === 'errored') return ic(I.warn, 'g bad');
+        if (st === 'active') return state() === 'completed' ? '<span class="dot"></span>' : '<span class="spin"></span>';
+        return ic('<circle cx="8" cy="8" r="6" stroke-dasharray="2 2.4"/>', 'g mute');
+      }
+      const row = (o) =>
+        `<button class="row${o.on ? ' on' : ''}${o.sub ? ' two' : ''}" ${o.attrs || ''} ${o.dis ? 'disabled' : ''}>` +
+        `<span class="rg">${o.g || ''}</span><span class="rt"><span class="tt">${o.t}</span>${o.sub ? `<span class="ts">${o.sub}</span>` : ''}</span>` +
+        `<span class="rm">${o.m || ''}</span>${o.chev ? `<span class="rc">${ic(I.chev)}</span>` : ''}</button>`;
+      const hint = (t) => `<p class="hint">${t}</p>`;
+      const outcomeOf = (a, taskId) => a.outcomes[taskId] || (a.currentTaskId === taskId ? 'active' : 'pending');
+      const id8 = M.run.id.slice(0, 8);
+
+      // Selection path: group › item › sandbox.
+      const S = { group: 'tasks', item: null, sb: null };
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+      let flipTimer = null;
+
+      /* ---- header ---- */
+      function renderHeader() {
+        const crumbs = [{ label: `Run ${id8}`, lvl: 0 }];
+        const G = { tasks: 'Tasks', personas: 'Personas', suggestions: 'Suggestions' };
+        if (S.group) crumbs.push({ label: G[S.group], lvl: 1 });
+        if (S.item) {
+          const lab = S.group === 'tasks' ? M.taskById[S.item].short : S.group === 'personas' ? M.personaOf(M.agentById[S.item]).name : M.suggestions.find((s) => s.id === S.item).title;
+          crumbs.push({ label: lab, lvl: 2 });
+        }
+        if (S.sb && S.sb.kind !== 'change') {
+          const a = M.agentById[S.sb.agentId];
+          crumbs.push({ label: S.group === 'personas' ? M.taskById[S.sb.taskId].short : `${M.personaOf(a).name}${S.group === 'suggestions' ? ' · ' + M.taskById[S.sb.taskId].short : ''}`, lvl: 3 });
+        }
+        $('#crumbs').innerHTML = crumbs
+          .map((c, i) => (i ? '<span class="sep">' + ic(I.chev) + '</span>' : '') + `<button data-lvl="${c.lvl}" ${i === crumbs.length - 1 ? 'aria-current="page"' : ''}>${esc(c.label)}</button>`)
+          .join('');
+        const st = state();
+        $('#top-r').innerHTML =
+          `<span class="state">${st === 'evaluating' ? '<span class="spin"></span>Evaluating' : `<span class="dot"></span>${st[0].toUpperCase() + st.slice(1)}`}</span>` +
+          `<span class="wide num">Started ${M.run.startedAt}</span><span class="wide num">${M.agents.length} personas · ${M.tasks.length} tasks</span>` +
+          (st === 'completed' ? `<button class="see" data-see>See suggestions (${M.suggestions.length})</button>` : '');
+      }
+      document.addEventListener('click', (e) => {
+        const c = e.target.closest('#crumbs [data-lvl]');
+        if (c) trim(Number(c.dataset.lvl));
+        if (e.target.closest('[data-see]')) openChange(M.suggestions[0].id);
+      });
+
+      function trim(lvl) {
+        if (lvl < 3) stopTimers();
+        if (lvl <= 0) Object.assign(S, { group: null, item: null, sb: null });
+        else if (lvl === 1) Object.assign(S, { item: null, sb: null });
+        else if (lvl === 2) {
+          if (S.group === 'suggestions') return openChange(S.item);
+          S.sb = null;
+        }
+        render();
+      }
+      function depth() {
+        if (S.sb && !(S.sb.kind === 'change')) return 3;
+        return S.item ? 2 : S.group ? 1 : 0;
+      }
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const d = depth();
+        if (d > 0) trim(d === 2 && S.group === 'suggestions' ? 1 : d - 1);
+      });
+
+      /* ---- column 1: run ---- */
+      function renderC1() {
+        const st = state();
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#h1').innerHTML = `<span class="eyebrow">Run</span><code class="meta">${id8}</code>`;
+        let h = '<div class="list">';
+        h += row({ attrs: 'data-group="tasks"', on: S.group === 'tasks', g: ic(I.tasks), t: 'Tasks', m: `${done}/${M.tasks.length} done`, chev: true });
+        h += row({ attrs: 'data-group="personas"', on: S.group === 'personas', g: ic(I.personas), t: 'Personas', m: M.agents.length, chev: true });
+        if (st === 'completed' || S.group === 'suggestions')
+          h += row({ attrs: 'data-group="suggestions"', on: S.group === 'suggestions', g: ic(I.suggestions), t: 'Suggestions', m: M.suggestions.length, chev: true });
+        if (st === 'evaluating') h += `<div class="row static"><span class="rg"><span class="spin"></span></span><span class="rt"><span class="tt">Evaluating</span></span><span class="rm">scoring runs</span></div>`;
+        h += '</div>';
+        h += `<dl class="summary"><dt>State</dt><dd>${st}</dd><dt>Started</dt><dd>${M.run.startedAt}</dd><dt>Personas</dt><dd>${M.agents.length}</dd><dt>Tasks</dt><dd>${M.tasks.length}</dd><dt>Run id</dt><dd><code>${id8}</code></dd></dl>`;
+        setCol('#c1', 'run', h);
+        $('#c1').querySelectorAll('[data-group]').forEach((b) =>
+          b.addEventListener('click', () => {
+            stopTimers();
+            Object.assign(S, { group: b.dataset.group, item: null, sb: null });
+            render();
+          }),
+        );
+      }
+
+      /* ---- column 2: group items ---- */
+      function renderC2() {
+        const c = '#c2';
+        if (!S.group) {
+          $('#h2').innerHTML = '<span class="eyebrow">&nbsp;</span>';
+          return setCol(c, 'none', hint('Select tasks or personas'));
+        }
+        if (S.group === 'tasks') {
+          const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+          $('#h2').innerHTML = `<span class="eyebrow">Tasks</span><span class="meta num">${done}/${M.tasks.length} done</span>`;
+          setCol(c, 'tasks', '<div class="list">' + M.tasks.map((t) => {
+            const scored = M.agents.filter((a) => t.id in a.outcomes).length;
+            return row({ attrs: `data-task="${t.id}"`, on: S.item === t.id, g: glyph(M.taskStatus(t.id)), t: esc(t.short), m: `${scored}/${M.agents.length}` });
+          }).join('') + '</div>');
+          $(c).querySelectorAll('[data-task]').forEach((b) => b.addEventListener('click', () => { stopTimers(); Object.assign(S, { item: b.dataset.task, sb: null }); render(); }));
+        } else if (S.group === 'personas') {
+          $('#h2').innerHTML = `<span class="eyebrow">Personas</span><span class="meta num">${M.agents.length}</span>`;
+          const completed = state() === 'completed';
+          setCol(c, 'personas', '<div class="list">' + M.agents.map((a) => {
+            const p = M.personaOf(a);
+            const task = M.taskById[a.currentTaskId];
+            const sub = completed ? 'done' : a.status === 'error' ? esc(a.lastError || 'error') : `<span class="spin"></span>${esc(task ? task.short : a.status)}`;
+            return row({ attrs: `data-agent="${a.id}"`, on: S.item === a.id, g: `<span class="avatar">${p.name[0]}</span>`, t: `${esc(p.name)} <span class="muted">${p.age}</span>`, sub, m: `<span class="score"><span class="p">${a.passed}</span> / <span class="f">${a.failed + a.errored}</span></span>` });
+          }).join('') + '</div>');
+          $(c).querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => { S.item = b.dataset.agent; openAgent(b.dataset.agent, null); }));
+        } else {
+          $('#h2').innerHTML = `<span class="eyebrow">Suggestions</span><span class="meta num">${M.suggestions.length}</span>`;
+          setCol(c, 'sugs', '<div class="list">' + M.suggestions.map((s) =>
+            row({ attrs: `data-sug="${s.id}"`, on: S.item === s.id, g: `<span class="cat ${s.category}"></span>`, t: esc(s.title), m: s.category }),
+          ).join('') + '</div>');
+          $(c).querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => openChange(b.dataset.sug)));
+        }
+      }
+
+      /* ---- column 3: detail ---- */
+      function renderC3() {
+        const c = '#c3';
+        if (!S.item) {
+          $('#h3').innerHTML = '<span class="eyebrow">&nbsp;</span>';
+          const what = { tasks: 'Select a task', personas: 'Select a persona', suggestions: 'Select a suggestion' }[S.group];
+          return setCol(c, 'none', what ? hint(what) : '');
+        }
+        if (S.group === 'tasks') {
+          const t = M.taskById[S.item];
+          const i = M.tasks.indexOf(t);
+          const scored = M.agents.filter((a) => t.id in a.outcomes).length;
+          $('#h3').innerHTML = `<span class="eyebrow">Task</span><span class="meta num">${i + 1} of ${M.tasks.length}</span>`;
+          setCol(c, 't:' + t.id,
+            `<div class="pad"><h2>${esc(t.name)}</h2><blockquote class="quote">${esc(t.description)}</blockquote>` +
+            `<dl class="facts"><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Success</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd class="num">${t.maxSteps}</dd></dl></div>` +
+            `<div class="sec"><span class="eyebrow">Attempts</span><span class="meta num">${scored}/${M.agents.length} scored</span></div>` +
+            '<div class="list">' + M.agents.map((a) => {
+              const st = outcomeOf(a, t.id);
+              const n = M.historyOf(a.id, t.id).length;
+              const on = S.sb && S.sb.agentId === a.id && S.sb.taskId === t.id;
+              return row({ attrs: `data-attempt="${a.id}"`, on, dis: st === 'pending', g: glyph(st), t: esc(M.personaOf(a).name), m: n ? `${n} steps` : '' });
+            }).join('') + '</div>');
+          $(c).querySelectorAll('[data-attempt]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.attempt, t.id)));
+        } else if (S.group === 'personas') {
+          const a = M.agentById[S.item];
+          const p = M.personaOf(a);
+          $('#h3').innerHTML = `<span class="eyebrow">Persona</span><span class="meta num">${Object.keys(a.outcomes).length}/${M.tasks.length} scored</span>`;
+          setCol(c, 'p:' + a.id,
+            `<div class="pad"><div class="card-who"><span class="avatar lg">${p.name[0]}</span><div class="rt"><h2>${esc(p.name)}</h2><span class="ts">${p.age} · ${p.gender}</span></div><span class="pill ${a.status}">${a.status}</span></div>` +
+            (p.modifiers.length ? `<div class="chips">${p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('')}</div>` : '<span class="muted">No modifiers</span>') +
+            `<p class="muted">${esc(p.blurb)}</p></div>` +
+            `<div class="sec"><span class="eyebrow">Tasks</span><span class="meta score num"><span class="p">${a.passed} pass</span> · <span class="f">${a.failed + a.errored} fail</span></span></div>` +
+            '<div class="list">' + M.tasks.map((t) => {
+              const n = M.historyOf(a.id, t.id).length;
+              return row({ attrs: `data-ptask="${t.id}"`, on: S.sb && S.sb.taskId === t.id, dis: !n, g: glyph(outcomeOf(a, t.id)), t: esc(t.short), m: n ? `${n} steps` : '' });
+            }).join('') + '</div>');
+          $(c).querySelectorAll('[data-ptask]').forEach((b) => b.addEventListener('click', () => openAgent(a.id, b.dataset.ptask)));
+        } else {
+          const s = M.suggestions.find((x) => x.id === S.item);
+          const params = JSON.stringify(s.change.params).replace(/[{}"]/g, '').replace(/:/g, ': ').replace(/,/g, ', ');
+          $('#h3').innerHTML = `<span class="eyebrow">Suggestion</span><span class="meta num">${M.suggestions.indexOf(s) + 1} of ${M.suggestions.length}</span>`;
+          setCol(c, 's:' + s.id,
+            `<div class="pad"><span class="tag"><span class="cat ${s.category}"></span>${s.category}</span><h2>${esc(s.title)}</h2><p class="muted">${esc(s.rationale)}</p>` +
+            `<dl class="facts"><dt>Change</dt><dd><code>${esc(s.change.type)}(${esc(params)})</code></dd></dl></div>` +
+            `<div class="sec"><span class="eyebrow">Evidence</span><span class="meta num">${s.evidence.length}</span></div>` +
+            '<div class="list">' + s.evidence.map((e) => {
+              const on = S.sb && S.sb.kind === 'replay' && S.sb.agentId === e.agentId && S.sb.taskId === e.taskId;
+              return row({ attrs: `data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}"`, on, g: `<span class="sect">§${e.step}</span>`, t: esc(M.personaOf(M.agentById[e.agentId]).name), m: esc(M.taskById[e.taskId].short) });
+            }).join('') + '</div>');
+          $(c).querySelectorAll('[data-ev-agent]').forEach((b) => b.addEventListener('click', () => setSb({ kind: 'replay', agentId: b.dataset.evAgent, taskId: b.dataset.evTask })));
+        }
+      }
+
+      /* ---- column 4: sandbox ---- */
+      function renderC4() {
+        const c = '#c4';
+        const sb = S.sb;
+        if (!sb) {
+          $('#h4').innerHTML = '<span class="eyebrow">Sandbox</span>';
+          const what = S.item ? (S.group === 'tasks' ? 'Select an attempt' : 'Select a task') : '';
+          return setCol(c, 'none', what ? hint(what) : '');
+        }
+        if (sb.kind === 'change') {
+          const s = M.suggestions.find((x) => x.id === S.item);
+          $('#h4').innerHTML = `<span class="eyebrow">Sandbox</span><span class="meta">Proposed change</span>`;
+          setCol(c, 'chg:' + s.id,
+            `<div class="sb"><div class="viewport${after ? ' after-' + s.change.type : ''}" id="vp"><div class="stage" id="stage">${M.pumpSvg({ screen: 'bolus' })}</div><div class="ground"></div><span class="vp-hint">Drag to orbit · scroll to zoom</span></div>` +
+            `<div class="ba"><div class="seg" role="group" aria-label="Compare"><button data-after="0" class="${after ? '' : 'on'}">Before</button><button data-after="1" class="${after ? 'on' : ''}">After</button></div><span class="ba-cap">${esc(s.change.type.replace(/_/g, ' '))}</span></div></div>`);
+          injectFx();
+          applyOrbit();
+          $(c).querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(b.dataset.after === '1', s)));
+          return;
+        }
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const steps = M.historyOf(a.id, t.id);
+        const outcome = a.outcomes[t.id];
+        $('#h4').innerHTML = `<span class="eyebrow">Sandbox</span><span class="meta">${sb.kind === 'live' ? 'Live' : 'Replay'} · ${esc(t.short)}</span>`;
+        const who =
+          S.group === 'personas'
+            ? ''
+            : `<div class="who"><div class="line"><span class="avatar">${p.name[0]}</span><span class="tt">${esc(p.name)}</span><span class="muted">${p.age} · ${p.gender}</span><span class="pill ${a.status}">${a.status}</span></div>` +
+              `<div class="line"><div class="chips">${p.modifiers.length ? p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('') : '<span class="muted" style="font-size:12px">No modifiers</span>'}</div>` +
+              `<div class="tdots" role="group" aria-label="This persona's tasks">${M.tasks.map((x) => `<button data-sbtask="${x.id}" class="${x.id === t.id ? 'on' : ''}" title="${esc(x.short)}" aria-label="${esc(x.short)}" ${M.historyOf(a.id, x.id).length ? '' : 'disabled'}>${glyph(outcomeOf(a, x.id))}</button>`).join('')}</div></div></div>`;
+        const failure =
+          outcome === 'failed' || outcome === 'errored'
+            ? `<div class="failure">${glyph(outcome)}<div><span class="eyebrow">${outcome === 'errored' ? 'Errored' : 'Failed'}</span><p>${esc(a.reasons[t.id] || 'No reason reported.')}</p></div></div>`
+            : '';
+        const transport =
+          sb.kind === 'replay'
+            ? `<div class="transport"><button class="play" id="play" aria-label="Play or pause"></button><input type="range" id="scrub" min="0" max="${steps.length}" aria-label="Scrub" /><span class="pos num" id="pos"></span>` +
+              `<div class="chips-x" id="chips">${steps.map((s, i) => `<button data-i="${i}">${i + 1} · ${esc(s.action)}</button>`).join('')}</div></div>`
+            : '';
+        setCol(c, `sb:${sb.kind}:${a.id}:${t.id}`,
+          `<div class="sb">${who}<div class="viewport" id="vp"><div class="stage" id="stage"></div><div class="ground"></div><span class="vp-hint">Drag to orbit · scroll to zoom</span></div>` +
+          `<div class="sb-body"><div id="step"></div>${failure}</div>${transport}</div>`);
+        applyOrbit();
+        $(c).querySelectorAll('[data-sbtask]').forEach((b) => b.addEventListener('click', () => openAgent(a.id, b.dataset.sbtask)));
+        if (sb.kind === 'replay') {
+          $('#play').addEventListener('click', () => {
+            if (replay.cursor >= steps.length) { replay.cursor = 0; replay.playing = true; renderStep(); }
+            else replay.playing = !replay.playing;
+            renderTransport();
+          });
+          $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+          $('#chips').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+        }
+        renderStep();
+        if (sb.kind === 'replay') renderTransport();
+      }
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((x) => x === 'press select')) return 'basal';
+        if (seen.some((x) => x.startsWith('hold up') || x === 'press up')) return 'bolus';
+        if (seen.some((x) => x === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderStep() {
+        const sb = S.sb;
+        if (!sb || sb.kind === 'change' || !$('#step')) return;
+        const a = M.agentById[sb.agentId];
+        const t = M.taskById[sb.taskId];
+        const steps = M.historyOf(a.id, t.id);
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const scr = screenFor(shown, steps, t);
+        const live = sb.kind === 'live';
+        $('#step').className = 'step' + (live ? ' live' : '');
+        $('#step').innerHTML =
+          `<div><span class="eyebrow">${live ? `Step ${shown}` : `Step ${shown} of ${steps.length}`} · ${esc(t.short)}</span>` +
+          `<div class="action">${cur ? esc(cur.action) : 'Waiting to start'}</div>${cur ? `<p class="reason">“${esc(cur.reasoning)}”</p>` : ''}</div>` +
+          (live ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: scr })}<figcaption>heard confirmation beep</figcaption></figure>` : '');
+        const pressed = cur && cur.action.match(/^(press|hold) (\w+)/);
+        const stage = $('#stage');
+        if (stage.dataset.screen !== scr) {
+          stage.dataset.screen = scr;
+          stage.innerHTML = M.pumpSvg({ screen: scr });
+        }
+        stage.querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', !!pressed && k.dataset.button === pressed[2]));
+      }
+
+      /* ---- replay transport ---- */
+      function stopTimers() {
+        clearInterval(replay.timer);
+        clearTimeout(flipTimer);
+      }
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing || !S.sb || S.sb.kind !== 'replay') return;
+          const n = M.historyOf(S.sb.agentId, S.sb.taskId).length;
+          if (replay.cursor >= n) { replay.playing = false; return renderTransport(); }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function renderTransport() {
+        if (!$('#play')) return;
+        const n = M.historyOf(S.sb.agentId, S.sb.taskId).length;
+        const ended = replay.cursor >= n;
+        $('#play').innerHTML = ic(replay.playing && !ended ? I.pause : I.play);
+        $('#scrub').value = replay.cursor;
+        $('#pos').textContent = `${replay.cursor}/${n}`;
+        const chips = $('#chips');
+        chips.querySelectorAll('button').forEach((b, i) => {
+          b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+          if (i === Math.min(replay.cursor, n - 1)) chips.scrollTo({ left: b.offsetLeft - chips.clientWidth / 2 + b.offsetWidth / 2, behavior: 'smooth' });
+        });
+      }
+
+      /* ---- navigation ---- */
+      function setSb(mode) {
+        stopTimers();
+        S.sb = mode;
+        replay = { cursor: 0, playing: true, timer: null };
+        render();
+        if (mode.kind === 'replay') startReplay();
+      }
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return setSb({ kind: 'replay', agentId, taskId });
+        if (state() === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId)) return setSb({ kind: 'live', agentId, taskId: a.currentTaskId });
+        setSb({ kind: 'replay', agentId, taskId: taskId || Object.keys(a.outcomes).pop() || a.currentTaskId });
+      }
+      function openChange(id) {
+        stopTimers();
+        Object.assign(S, { group: 'suggestions', item: id, sb: { kind: 'change' } });
+        after = false;
+        render();
+        const s = M.suggestions.find((x) => x.id === id);
+        flipTimer = setTimeout(() => {
+          if (S.sb && S.sb.kind === 'change' && S.item === id && !after) setAfter(true, s);
+        }, 900);
+      }
+      function setAfter(v, s) {
+        after = v;
+        $('#c4').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+        $('#vp').className = 'viewport' + (v ? ' after-' + s.change.type : '');
+      }
+      function injectFx() {
+        $('#stage svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#2f6fdf"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#fff" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#2f6fdf" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+
+      /* ---- render ---- */
+      function setCol(sel, key, html) {
+        const el = $(sel);
+        el.innerHTML = html;
+        if (el.dataset.k !== key) {
+          el.dataset.k = key;
+          el.classList.remove('enter');
+          void el.offsetWidth;
+          el.classList.add('enter');
+        }
+      }
+      function render() {
+        renderHeader();
+        renderC1();
+        renderC2();
+        renderC3();
+        renderC4();
+      }
+
+      /* cosmetic orbit */
+      let rx = -4, ry = 12, z = 1, drag = null;
+      function applyOrbit() {
+        const st = $('#stage');
+        if (st) st.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`;
+      }
+      document.addEventListener('pointerdown', (e) => {
+        const vp = e.target.closest('#vp');
+        if (!vp) return;
+        drag = { x: e.clientX, y: e.clientY, rx, ry };
+        vp.classList.add('dragging');
+        $('#stage').style.transition = 'none';
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        ry = drag.ry + (e.clientX - drag.x) * 0.4;
+        rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+        applyOrbit();
+      });
+      window.addEventListener('pointerup', () => {
+        if (!drag) return;
+        drag = null;
+        const vp = $('#vp');
+        if (vp) vp.classList.remove('dragging');
+        if ($('#stage')) $('#stage').style.transition = '';
+      });
+      document.addEventListener('wheel', (e) => {
+        if (!e.target.closest('#vp')) return;
+        e.preventDefault();
+        z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+        applyOrbit();
+      }, { passive: false });
+
+      /* mock controls */
+      document.addEventListener('mock:state', render);
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') {
+          stopTimers();
+          Object.assign(S, { group: 'tasks', item: null, sb: null });
+          return render();
+        }
+        if (k === 'change') return openChange(M.defaults.change.suggestionId);
+        const d = M.defaults[k];
+        if (k === 'live') Object.assign(S, { group: 'personas', item: d.agentId });
+        else Object.assign(S, { group: 'tasks', item: d.taskId });
+        setSb({ kind: k, agentId: d.agentId, taskId: d.taskId });
+      });
+
+      render();
+      M.mountControls();
+    </script>
+  </body>
+</html>

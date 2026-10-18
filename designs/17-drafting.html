@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Drafting · Infallible design 17</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* 17 · Drafting — the run as a technical drawing sheet: frame line, title block, revision table, parts list, leader-line annotations. */
+      :root {
+        --page: #f7f7f5;
+        --sheet: #ffffff;
+        --ink: #1a1d21;
+        --ink-2: #5d636b;
+        --line: #5b6b7f;
+        --hair: rgba(91, 107, 127, 0.6);
+        --rule: rgba(26, 29, 33, 0.1);
+        --tint: rgba(91, 107, 127, 0.08);
+        --ok: #2f7a45;
+        --bad: #b8392b;
+        --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+        --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body { margin: 0; background: var(--page); color: var(--ink); font: 13px/1.5 var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased; }
+      h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+      ul, ol { padding: 0; list-style: none; }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; opacity: 0.4; }
+      :focus-visible { outline: 1px solid var(--line); outline-offset: 2px; }
+      code { font-family: var(--mono); font-size: 12px; }
+      .eye { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--line); }
+      .mono { font-family: var(--mono); }
+      .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+      .muted { color: var(--ink-2); }
+
+      /* sheet + frame */
+      .sheet { position: fixed; inset: 16px; background: var(--sheet); border: 1px solid var(--rule); }
+      .frame { position: absolute; inset: 24px; border: 1px solid var(--line); display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+      .work { min-height: 0; display: grid; }
+      .view { min-height: 0; display: grid; grid-template-columns: minmax(300px, 352px) minmax(0, 1fr) minmax(320px, 408px); animation: fade 0.25s var(--ease) both; }
+      .view[hidden] { display: none; }
+      #sb.view { grid-template-columns: minmax(280px, 336px) minmax(0, 1fr) minmax(232px, 272px); }
+      .pane { min-height: 0; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+      .pane.l { border-right: 1px solid var(--hair); }
+      .pane.r { border-left: 1px solid var(--hair); }
+
+      /* bottom band: strip + title block */
+      .band { display: grid; grid-template-columns: minmax(0, 1fr) 336px; border-top: 1px solid var(--line); }
+      .strip { padding: 8px 16px; display: flex; align-items: center; gap: 16px; min-width: 0; border-right: 1px solid var(--line); }
+      .tb { display: grid; grid-template-columns: 1fr 1fr; font-family: var(--mono); font-size: 11px; }
+      .tb div { padding: 4px 8px; border-bottom: 1px solid var(--hair); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+      .tb div:nth-child(even) { border-right: 1px solid var(--hair); }
+      .tb div:nth-last-child(-n + 2) { border-bottom: 0; }
+      .tb span { color: var(--line); }
+      .tb b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+      .tb .proj { grid-column: 1 / -1; border-right: 0 !important; padding: 8px; }
+      .tb .proj b { font-family: var(--sans); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+      .legend { display: flex; gap: 16px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+      .legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+      /* block heads + rows */
+      .blk-h { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+      .blk-h h2 { font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+      .thead, .row { display: grid; align-items: center; gap: 8px; padding: 0 8px; }
+      .thead { font-family: var(--mono); font-size: 11px; color: var(--line); padding-top: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--hair); }
+      .row { width: 100%; min-height: 32px; border-bottom: 1px solid var(--rule); transition: background 0.15s var(--ease); }
+      .row:hover:not(:disabled):not(.static) { background: var(--tint); }
+      .row.on { background: var(--tint); box-shadow: inset 2px 0 0 var(--line); }
+      .row .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .row.on .t { font-weight: 600; }
+      .row .m { font-family: var(--mono); font-size: 11px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .row .k { font-family: var(--mono); font-size: 11px; color: var(--line); }
+      .rev .thead, .rev .row { grid-template-columns: 24px 16px 1fr 40px; }
+      .parts .thead, .parts .row { grid-template-columns: 24px minmax(0, 1fr) 24px minmax(0, 0.9fr) 16px 16px 16px; }
+      .att .row { grid-template-columns: 24px 16px 1fr auto; }
+      .ptasks .row { grid-template-columns: 24px 16px 1fr; }
+      .sugs .row { grid-template-columns: 16px 1fr; padding-top: 8px; padding-bottom: 8px; }
+      .sugs .row .t { white-space: normal; }
+      .ev .row { grid-template-columns: 32px 1fr auto; }
+      .row.a .t { color: var(--line); font-weight: 600; }
+      .only-completed, .only-evaluating { display: none !important; }
+      body[data-state='completed'] .only-completed, body[data-state='evaluating'] .only-evaluating { display: grid !important; }
+      body[data-state='completed'] .spin { display: none !important; }
+      .note-line { padding: 8px; font-size: 12px; color: var(--ink-2); grid-template-columns: 16px 1fr; }
+
+      /* glyphs */
+      .g { width: 16px; height: 16px; display: block; }
+      .spin { width: 12px; height: 12px; border: 1.5px solid var(--line); border-right-color: transparent; border-radius: 50%; animation: spin 0.9s linear infinite; display: inline-block; }
+
+      /* notes */
+      .notes { display: grid; gap: 16px; }
+      .notes ol { display: grid; gap: 16px; counter-reset: n; }
+      .notes ol > li { display: grid; grid-template-columns: 24px 1fr; gap: 0 8px; counter-increment: n; }
+      .notes ol > li::before { content: counter(n) '.'; font-family: var(--mono); font-size: 11px; color: var(--line); padding-top: 2px; grid-row: 1 / span 4; }
+      .notes ol > li > * { grid-column: 2; min-width: 0; }
+      .fact { display: grid; grid-template-columns: 72px 1fr; gap: 4px 8px; }
+      .fact dt { font-family: var(--mono); font-size: 11px; color: var(--line); padding-top: 2px; }
+      .quote { color: var(--ink-2); border-left: 1px solid var(--hair); padding-left: 8px; }
+      h3 { font-size: 18px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+      .chip { font-family: var(--mono); font-size: 11px; padding: 0 8px; border: 1px solid var(--hair); color: var(--ink-2); }
+      .pill { font-family: var(--mono); font-size: 11px; color: var(--line); border: 1px solid var(--line); padding: 0 8px; }
+      .who { display: grid; grid-template-columns: 32px 1fr auto; gap: 8px; align-items: center; }
+      .av { width: 32px; height: 32px; border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--line); }
+      .action { font-size: 18px; font-weight: 600; font-family: var(--mono); letter-spacing: -0.02em; animation: fade 0.2s var(--ease) both; }
+      .detail { border: 1px solid var(--line); }
+      .detail .lbl { display: flex; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--hair); }
+      .detail svg { display: block; width: 100%; }
+      .detail figcaption { padding: 4px 8px; font-size: 12px; color: var(--ink-2); border-top: 1px solid var(--hair); }
+      .fail .eye { color: var(--bad); }
+      .back { display: inline-flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 11px; color: var(--line); padding: 4px 8px; margin: -4px -8px; }
+      .back:hover { background: var(--tint); }
+      .cat { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+      .ba { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); }
+      .ba button { padding: 4px 8px; font-family: var(--mono); font-size: 11px; text-align: center; color: var(--line); transition: background 0.2s var(--ease), color 0.2s var(--ease); }
+      .ba button + button { border-left: 1px solid var(--line); }
+      .ba button.on { background: var(--line); color: #fff; }
+
+      /* drawing */
+      .draw { min-height: 0; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; padding: 24px; }
+      .draw .hd, .draw .ft { display: flex; justify-content: space-between; gap: 16px; font-family: var(--mono); font-size: 11px; color: var(--line); }
+      .vp { min-height: 0; display: grid; place-items: center; cursor: grab; user-select: none; overflow: hidden; }
+      .vp.dragging { cursor: grabbing; }
+      .stage { height: 94%; max-width: 100%; aspect-ratio: 420 / 360; transition: transform 0.3s var(--ease); }
+      .stage > svg { width: 100%; height: 100%; display: block; overflow: visible; }
+      .lead { stroke: var(--hair); stroke-width: 0.6; fill: none; }
+      .lead-dot { fill: var(--line); }
+      .lead-t { font-family: var(--mono); font-size: 8px; fill: var(--line); letter-spacing: 0.04em; }
+      .lead-act .lead { stroke: var(--line); stroke-width: 0.8; }
+      .lead-act .lead-t { fill: var(--ink); font-weight: 600; font-size: 9px; }
+      .key, .screen text, .fx { transition: transform 0.3s var(--ease), opacity 0.3s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .key.pressed rect { fill: #6a7889; stroke: #fff; stroke-width: 1; }
+      .fx { opacity: 0; }
+      .vp.after-move_button .key-select { transform: translateY(16px); }
+      .vp.after-resize_text .screen text { transform: scale(1.5); }
+      .vp.after-confirm_dialog .fx-dialog, .vp.after-change_timeout .fx-timeout, .vp.after-add_audio_cue .fx-audio { opacity: 1; }
+
+      /* sequence strip */
+      .seq { display: grid; grid-template-columns: auto auto 192px minmax(0, 1fr); gap: 16px; align-items: center; width: 100%; min-width: 0; }
+      .play { width: 32px; height: 32px; border: 1px solid var(--line); display: grid; place-items: center; color: var(--line); }
+      .play:hover { background: var(--tint); }
+      .seq input[type='range'] { width: 100%; accent-color: var(--line); cursor: pointer; }
+      .cells { display: flex; overflow-x: auto; scrollbar-width: thin; min-width: 0; border-left: 1px solid var(--hair); }
+      .cells button { flex: 0 0 32px; height: 32px; display: grid; place-items: center; font-family: var(--mono); font-size: 11px; border: 1px solid var(--hair); border-left: 0; color: var(--ink-2); transition: background 0.15s var(--ease), color 0.15s var(--ease); }
+      .cells button.done { background: var(--tint); color: var(--ink); }
+      .cells button.next { box-shadow: inset 0 0 0 1px var(--line); color: var(--line); font-weight: 600; }
+      .cells button:hover { color: var(--ink); }
+
+      @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        .spin { animation: spin 2s linear infinite !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <div class="sheet">
+      <div class="frame">
+        <div class="work">
+          <section class="view" id="dash">
+            <aside class="pane l" id="d-left"></aside>
+            <div class="draw">
+              <div class="hd"><span>VIEW 1 · FRONT</span><span>pump-front</span></div>
+              <div class="vp" id="d-vp"><div class="stage" id="d-stage"></div></div>
+              <div class="ft"><span>Drawn by agents · checked by firmware</span><span>Dimensions in mm</span></div>
+            </div>
+            <aside class="pane r" id="d-right"></aside>
+          </section>
+          <section class="view" id="sb" hidden>
+            <aside class="pane l" id="sb-left"></aside>
+            <div class="draw">
+              <div class="hd"><span id="sb-view"></span><span>Drag to orbit · scroll to zoom</span></div>
+              <div class="vp" id="vp"><div class="stage" id="stage"></div></div>
+              <div class="ft"><span id="sb-cap"></span><span>Scale 1:1</span></div>
+            </div>
+            <aside class="pane r" id="sb-right"></aside>
+          </section>
+        </div>
+        <div class="band">
+          <div class="strip" id="strip"></div>
+          <div class="tb" id="tb"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const pad = (n) => String(n).padStart(2, '0');
+      const CHECK = '<svg class="g" viewBox="0 0 16 16" fill="none" stroke="var(--ok)" stroke-width="1.5"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+      const G = {
+        passed: CHECK,
+        done: CHECK,
+        failed: '<svg class="g" viewBox="0 0 16 16" fill="none" stroke="var(--bad)" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+        errored: '<svg class="g" viewBox="0 0 16 16" fill="none" stroke="var(--bad)" stroke-width="1.3"><path d="M8 2.5l6 11H2z"/><path d="M8 6.5v3.5M8 11.6v.4"/></svg>',
+        pending: '<svg class="g" viewBox="0 0 16 16" fill="none" stroke="var(--hair)" stroke-width="1.2"><circle cx="8" cy="8" r="4.5"/></svg>',
+        disabled: '<svg class="g" viewBox="0 0 16 16" fill="none" stroke="rgba(26,29,33,.25)" stroke-width="1.2"><path d="M4 8h8"/></svg>',
+        active: '<span class="g" style="display:grid;place-items:center"><i class="spin"></i></span>',
+        arrow: '<svg class="g" viewBox="0 0 16 16" fill="none" stroke="var(--line)" stroke-width="1.4"><path d="M3 8h10M9 4l4 4-4 4"/></svg>',
+      };
+      const glyph = (st) => G[st] || G.pending;
+      const CAT = {
+        hardware: '<svg width="8" height="8" viewBox="0 0 8 8"><rect x=".5" y=".5" width="7" height="7" fill="none" stroke="var(--line)"/></svg>',
+        firmware: '<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3.5" fill="var(--line)"/></svg>',
+        interaction: '<svg width="8" height="8" viewBox="0 0 8 8"><path d="M4 .5L7.5 7.5H.5z" fill="none" stroke="var(--line)"/></svg>',
+      };
+      const PLAY = '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg>';
+      const PAUSE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg>';
+      // Key centres in pump coordinates, plus which side the leader exits.
+      const KEYS = { back: [48, 161, 'l'], up: [132, 161, 'r'], select: [90, 201, 'r'], home: [48, 243, 'l'], down: [132, 243, 'r'] };
+
+      let selectedTask = 't-alarm';
+      let sb = null;
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+      let afterTimer = null;
+
+      /* drawing: pump nested in a wider sheet with leader lines and a ground shadow */
+      function drawing(opts, leaders) {
+        const pump = M.pumpSvg(opts).replace('<svg class="pump', '<svg x="0" y="0" width="180" height="320" class="pump');
+        const lines = leaders
+          .map(([x, y, tx, ty, label, act]) => {
+            const right = tx > x;
+            return `<g class="${act ? 'lead-act' : ''}"><circle class="lead-dot" cx="${x}" cy="${y}" r="1.5"/><path class="lead" d="M${x} ${y}L${tx} ${ty}"/><text class="lead-t" x="${tx + (right ? 4 : -4)}" y="${ty + 3}" text-anchor="${right ? 'start' : 'end'}">${esc(label)}</text></g>`;
+          })
+          .join('');
+        return `<svg viewBox="-120 -10 420 360" xmlns="http://www.w3.org/2000/svg"><ellipse cx="90" cy="334" rx="84" ry="7" fill="rgba(26,29,33,.05)"/><ellipse cx="90" cy="333" rx="58" ry="4" fill="rgba(26,29,33,.07)"/>${pump}${lines}</svg>`;
+      }
+      const dashLeaders = [
+        [150, 60, 214, 40, 'SCREEN'],
+        [118, 201, 214, 201, 'SELECT'],
+        [150, 161, 214, 140, 'UP'],
+        [150, 243, 214, 262, 'DOWN'],
+        [30, 161, -40, 140, 'BACK'],
+        [30, 243, -40, 262, 'HOME'],
+      ];
+
+      /* title block */
+      function renderTB() {
+        const sheet = !sb ? '1 of 2' : sb.kind === 'change' ? '2 of 2 · A' : '2 of 2';
+        $('#tb').innerHTML =
+          `<div class="proj"><span>Project</span><b>Infallible</b></div>` +
+          `<div><span>Sheet</span><b>${sheet}</b></div><div><span>Run</span><b>${esc(M.run.id.slice(0, 8))}</b></div>` +
+          `<div><span>Started</span><b>${esc(M.run.startedAt)}</b></div><div><span>State</span><b>${esc(document.body.dataset.state)}</b></div>` +
+          `<div><span>Parts</span><b>${M.agents.length} × ${M.tasks.length}</b></div><div><span>Scale</span><b>1:1</b></div>`;
+      }
+
+      /* ---- sheet 1 ---- */
+      function renderDashboard() {
+        renderTB();
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        const left = $('#d-left');
+        left.innerHTML = `
+          <section class="rev">
+            <header class="blk-h"><h2>Revision</h2><span class="num eye">${done}/${M.tasks.length} done</span></header>
+            <div class="thead"><span>Rev</span><span></span><span>Description</span><span class="num">Scored</span></div>
+            ${M.tasks
+              .map((t, i) => {
+                const n = M.agents.filter((a) => t.id in a.outcomes).length;
+                return `<button class="row ${t.id === selectedTask ? 'on' : ''}" data-task="${t.id}"><span class="k">${pad(i + 1)}</span>${glyph(M.taskStatus(t.id))}<span class="t">${esc(t.name)}</span><span class="m">${n}/${M.agents.length}</span></button>`;
+              })
+              .join('')}
+            <button class="row a only-completed" data-open-change><span class="k">A</span>${G.arrow}<span class="t">See suggestions (${M.suggestions.length})</span><span class="m">${M.suggestions.length}</span></button>
+            <div class="row static note-line only-evaluating"><span class="g" style="display:grid;place-items:center"><i class="spin"></i></span><span>Note: Evaluating, scoring final attempts</span></div>
+          </section>
+          <section class="notes" id="notes"></section>`;
+        left.querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => {
+            selectedTask = b.dataset.task === selectedTask ? null : b.dataset.task;
+            renderDashboard();
+          }),
+        );
+        left.querySelector('[data-open-change]').addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+        renderNotes();
+
+        const completed = document.body.dataset.state === 'completed';
+        $('#d-right').innerHTML = `
+          <section class="parts">
+            <header class="blk-h"><h2>Parts list</h2><span class="num eye">${M.agents.length} personas</span></header>
+            <div class="thead"><span>Item</span><span>Name</span><span class="num">Age</span><span>Current</span><span class="num">P</span><span class="num">F</span><span></span></div>
+            ${M.agents
+              .map((a, i) => {
+                const p = M.personaOf(a);
+                const task = M.taskById[a.currentTaskId];
+                const cur = completed ? 'done' : a.status === 'error' ? 'error' : task ? task.short : a.status;
+                const st = !completed && a.status === 'working' ? '<i class="spin"></i>' : '';
+                return `<button class="row" data-agent="${a.id}" title="${esc(p.long)}"><span class="k">${pad(i + 1)}</span><span class="t">${esc(p.name)}</span><span class="m">${p.age}</span><span class="t muted">${esc(cur)}</span><span class="m" style="color:var(--ok)">${a.passed}</span><span class="m" style="color:var(--bad)">${a.failed + a.errored}</span><span>${st}</span></button>`;
+              })
+              .join('')}
+          </section>
+          <section class="legend" style="flex-direction:column;align-items:flex-start;gap:8px">
+            <span class="eye">General notes</span>
+            <span>1. Select an item to open sheet 2.</span>
+            <span>2. P passed · F failed or errored.</span>
+            <span>3. Working items open live while running.</span>
+          </section>`;
+        $('#d-right').querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, null)));
+
+        $('#d-stage').innerHTML = drawing({ screen: 'home' }, dashLeaders);
+        if (!sb) renderStrip();
+      }
+
+      function renderNotes() {
+        const el = $('#notes');
+        const t = M.taskById[selectedTask];
+        if (!t) {
+          el.innerHTML = `<header class="blk-h"><h2>Notes</h2></header><p class="muted">Select a revision to read its brief and each persona's attempt.</p>`;
+          return;
+        }
+        el.innerHTML = `
+          <header class="blk-h"><h2>Notes · Rev ${pad(M.tasks.indexOf(t) + 1)}</h2><button class="eye" id="notes-close">Close</button></header>
+          <ol>
+            <li><h3>${esc(t.name)}</h3></li>
+            <li><p class="quote">${esc(t.description)}</p></li>
+            <li><dl class="fact"><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Predicate</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd class="mono">${t.maxSteps}</dd></dl></li>
+            <li><div class="att">${M.agents
+              .map((a, j) => {
+                const o = a.outcomes[t.id];
+                const live = a.currentTaskId === t.id && !o;
+                const n = M.historyOf(a.id, t.id).length;
+                const st = o || (live ? 'active' : 'disabled');
+                return `<button class="row" data-agent="${a.id}" ${o || live ? '' : 'disabled'}><span class="k">${pad(j + 1)}</span>${glyph(st)}<span class="t">${esc(M.personaOf(a).name)}</span><span class="m">${n ? n + ' steps' : 'pending'}</span></button>`;
+              })
+              .join('')}</div></li>
+          </ol>`;
+        $('#notes-close').addEventListener('click', () => {
+          selectedTask = null;
+          renderDashboard();
+        });
+        el.querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, t.id)));
+      }
+
+      function renderStrip() {
+        if (sb && sb.kind === 'replay') {
+          $('#strip').innerHTML = `<div class="seq"><span class="eye">Sequence</span><button class="play" id="play" aria-label="Play or pause"></button><input type="range" id="scrub" min="0" max="1" value="0" aria-label="Scrub" /><div class="cells" id="cells"></div></div>`;
+          $('#play').addEventListener('click', togglePlay);
+          $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+          return;
+        }
+        const live = sb && sb.kind === 'live';
+        $('#strip').innerHTML = `<div class="legend">${live ? `<span class="eye">Sequence</span><span><i class="spin"></i>live, following agent</span>` : '<span class="eye">Legend</span>'}<span>${G.passed}passed</span><span>${G.failed}failed</span><span>${G.errored}errored</span><span>${G.active}in progress</span><span>${G.disabled}not started</span></div>`;
+      }
+
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (document.body.dataset.state === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId))
+          return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+        openSandbox({ kind: 'replay', agentId, taskId: target });
+      }
+
+      /* ---- sheet 2 ---- */
+      function openSandbox(mode) {
+        sb = mode;
+        after = false;
+        clearTimeout(afterTimer);
+        clearInterval(replay.timer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#dash').hidden = true;
+        $('#sb').hidden = false;
+        renderTB();
+        renderStrip();
+        renderSandbox();
+        if (mode.kind === 'replay') startReplay();
+      }
+      function closeSandbox() {
+        clearInterval(replay.timer);
+        clearTimeout(afterTimer);
+        sb = null;
+        $('#sb').hidden = true;
+        $('#dash').hidden = false;
+        renderDashboard();
+      }
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sb) closeSandbox();
+      });
+      const backBtn =
+        '<button class="back" data-back><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8H3M7 4L3 8l4 4"/></svg>Back to sheet 1</button>';
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+
+      function renderSandbox() {
+        const left = $('#sb-left');
+        const right = $('#sb-right');
+        $('#vp').className = 'vp';
+
+        if (sb.kind === 'change') {
+          const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+          $('#sb-view').textContent = `REV A · CHANGE ${M.suggestions.indexOf(s) + 1} OF ${M.suggestions.length}`;
+          $('#sb-cap').textContent = s.title;
+          const ty = s.change.type;
+          const target =
+            ty === 'move_button' ? [[118, 201, 214, 224, 'SELECT +8 mm', true]] : ty === 'resize_text' ? [[150, 82, 214, 82, 'SCREEN TEXT ×2', true]] : [[150, 60, 214, 40, ty.replace(/_/g, ' ').toUpperCase(), true]];
+          $('#stage').innerHTML = drawing({ screen: 'bolus' }, target);
+          injectFx();
+          const params = JSON.stringify(s.change.params).replace(/[{}"]/g, '').replace(/,/g, ', ');
+          left.innerHTML = `
+            <div>${backBtn}</div>
+            <section class="notes">
+              <header class="blk-h"><h2>Notes · Rev A</h2><span class="cat">${CAT[s.category]}${s.category}</span></header>
+              <ol>
+                <li><h3>${esc(s.title)}</h3></li>
+                <li><p class="muted">${esc(s.rationale)}</p></li>
+                <li><div class="ba"><button data-after="0" class="on">Before</button><button data-after="1">After</button></div></li>
+                <li><dl class="fact"><dt>Change</dt><dd><code>${esc(ty)}</code></dd><dt>Params</dt><dd><code>${esc(params)}</code></dd></dl></li>
+                <li><div class="ev"><div class="eye" style="padding-bottom:4px;border-bottom:1px solid var(--hair)">Evidence</div>${s.evidence
+                  .map(
+                    (e) =>
+                      `<button class="row" data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}"><span class="k">§${e.step}</span><span class="t">${esc(M.personaOf(M.agentById[e.agentId]).name)}</span><span class="m">${esc(M.taskById[e.taskId].short)}</span></button>`,
+                  )
+                  .join('')}</div></li>
+              </ol>
+            </section>`;
+          left.querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(s, b.dataset.after === '1')));
+          left.querySelectorAll('[data-ev-agent]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evAgent, taskId: b.dataset.evTask })));
+          left.querySelector('[data-back]').addEventListener('click', closeSandbox);
+          right.innerHTML = `
+            <section class="sugs">
+              <header class="blk-h"><h2>Changes</h2><span class="num eye">${M.suggestions.length}</span></header>
+              ${M.suggestions.map((x, i) => `<button class="row ${x.id === s.id ? 'on' : ''}" data-sug="${x.id}"><span>${CAT[x.category]}</span><span class="t">${esc(x.title)}</span></button>`).join('')}
+            </section>
+            <section class="legend" style="flex-direction:column;align-items:flex-start;gap:8px"><span class="eye">Category</span><span class="cat">${CAT.hardware}hardware</span><span class="cat">${CAT.firmware}firmware</span><span class="cat">${CAT.interaction}interaction</span></section>`;
+          right.querySelectorAll('[data-sug]').forEach((b) =>
+            b.addEventListener('click', () => {
+              sb.suggestionId = b.dataset.sug;
+              after = false;
+              clearTimeout(afterTimer);
+              renderSandbox();
+            }),
+          );
+          afterTimer = setTimeout(() => {
+            if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) setAfter(s, true);
+          }, 900);
+          return;
+        }
+
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const outcome = a.outcomes[sb.taskId];
+        $('#sb-view').textContent = `VIEW ${M.agents.indexOf(a) + 1}.${M.tasks.indexOf(t) + 1} · ${sb.kind === 'live' ? 'LIVE' : 'REPLAY'}`;
+        $('#sb-cap').textContent = `${p.name} · ${t.short}`;
+        left.innerHTML = `
+          <div>${backBtn}</div>
+          <section class="notes">
+            <header class="blk-h"><h2>Notes</h2><span class="eye">${sb.kind}</span></header>
+            <ol>
+              <li><div class="who"><span class="av">${esc(p.name[0])}</span><div><h3>${esc(p.name)}</h3><span class="muted">${p.age}, ${esc(p.gender)}</span></div><span class="pill">${esc(a.status)}</span></div>
+                <div class="chips">${p.modifiers.length ? p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('') : '<span class="chip">no modifiers</span>'}</div></li>
+              <li><div id="step-note"></div></li>
+              ${outcome === 'failed' || outcome === 'errored' ? `<li class="fail"><span class="eye">${outcome === 'errored' ? 'Errored' : 'Failed'}</span><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></li>` : ''}
+            </ol>
+          </section>`;
+        left.querySelector('[data-back]').addEventListener('click', closeSandbox);
+
+        right.innerHTML = `
+          <section class="ptasks">
+            <header class="blk-h"><h2>Revision</h2><span class="num eye">${Object.keys(a.outcomes).length}/${M.tasks.length}</span></header>
+            ${M.tasks
+              .map((x, i) => {
+                const o = a.outcomes[x.id];
+                const live = a.currentTaskId === x.id && !o;
+                const has = M.historyOf(a.id, x.id).length > 0;
+                const st = o || (live ? 'active' : 'disabled');
+                return `<button class="row ${x.id === sb.taskId ? 'on' : ''}" data-task="${x.id}" data-live="${live ? 1 : 0}" ${has ? '' : 'disabled'}><span class="k">${pad(i + 1)}</span>${glyph(st)}<span class="t">${esc(x.short)}</span></button>`;
+              })
+              .join('')}
+          </section>`;
+        right.querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.task })),
+        );
+
+        if (sb.kind === 'replay') {
+          const steps = stepsFor();
+          $('#scrub').max = steps.length;
+          $('#cells').innerHTML = steps.map((s, i) => `<button data-i="${i}" title="${esc(s.action)}">${i + 1}</button>`).join('');
+          $('#cells').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+          renderTransport();
+        }
+        renderStep();
+      }
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((x) => x === 'press select')) return 'basal';
+        if (seen.some((x) => x.startsWith('hold up') || x === 'press up')) return 'bolus';
+        if (seen.some((x) => x === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const screen = screenFor(shown, steps, t);
+        const m = cur && cur.action.match(/^(press|hold) (\w+)/);
+        const key = m && KEYS[m[2]] ? m[2] : null;
+        const leaders = key ? [[KEYS[key][0], KEYS[key][1], KEYS[key][2] === 'r' ? 214 : -34, KEYS[key][1] - 24, cur.action, true]] : [];
+        $('#stage').innerHTML = drawing({ screen }, leaders);
+        $('#stage').querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', k.dataset.button === key));
+        $('#step-note').innerHTML = `
+          <span class="eye">${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${esc(t ? t.short : '')}</span>
+          <div class="action">${cur ? esc(cur.action) : 'waiting'}</div>
+          ${cur && cur.reasoning ? `<p class="quote" style="margin-top:8px">${esc(cur.reasoning)}</p>` : ''}
+          ${sb.kind === 'live' ? `<figure class="detail" style="margin-top:16px"><div class="lbl"><span class="eye">DETAIL A</span><span class="eye">agent view</span></div>${M.frameSvg(a.personaId, { screen })}<figcaption>heard confirmation beep (4 kHz, 80 ms)</figcaption></figure>` : ''}`;
+      }
+
+      /* transport */
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing) return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            renderTransport();
+            return;
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function togglePlay() {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        $('#scrub').value = replay.cursor;
+        $('#play').innerHTML = replay.playing && replay.cursor < n ? PAUSE : PLAY;
+        const cells = $('#cells');
+        cells.querySelectorAll('button').forEach((b, i) => {
+          b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+          // Scroll the strip only; scrollIntoView would also nudge the page.
+          if (i === replay.cursor) cells.scrollLeft = b.offsetLeft - cells.offsetLeft - cells.clientWidth / 2;
+        });
+      }
+
+      /* change fx */
+      function injectFx() {
+        $('#stage svg.pump').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#5b6b7f"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#fff" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#9fb3c8" stroke-width="1.2"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+      function setAfter(s, v) {
+        after = v;
+        $('#sb-left').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+        $('#vp').className = 'vp' + (v ? ' after-' + s.change.type : '');
+      }
+
+      /* cosmetic orbit */
+      (function orbit() {
+        const vp = $('#vp');
+        const stage = $('#stage');
+        let drag = null;
+        let rx = 0;
+        let ry = 0;
+        let z = 1;
+        const apply = () => (stage.style.transform = `perspective(1200px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        vp.addEventListener('pointerdown', (e) => {
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          stage.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.3;
+          rx = Math.max(-30, Math.min(30, drag.rx - (e.clientY - drag.y) * 0.25));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          if (!drag) return;
+          drag = null;
+          vp.classList.remove('dragging');
+          stage.style.transition = '';
+        });
+        vp.addEventListener(
+          'wheel',
+          (e) => {
+            e.preventDefault();
+            z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+            apply();
+          },
+          { passive: false },
+        );
+      })();
+
+      document.addEventListener('mock:state', () => {
+        if (!sb) return renderDashboard();
+        renderTB();
+        if (sb.kind === 'live') renderStrip();
+      });
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') return closeSandbox();
+        if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+        openSandbox(Object.assign({ kind: k }, M.defaults[k]));
+      });
+
+      renderDashboard();
+      M.mountControls();
+    </script>
+  </body>
+</html>

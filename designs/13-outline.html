@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Outline · Infallible design 13</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* 13 · Outline — the whole run is one keyboard-driven nested outline; the right pane shows whatever row is selected. */
+      :root {
+        --page: #fcfcfc;
+        --pane: #ffffff;
+        --ink: #17181a;
+        --ink-2: #5f6368;
+        --ink-3: #9aa0a6;
+        --line: rgba(0, 0, 0, 0.1);
+        --hover: rgba(0, 0, 0, 0.035);
+        --accent: #4f46e5;
+        --accent-soft: rgba(79, 70, 229, 0.08);
+        --green: #1f8a4c;
+        --red: #c93a2e;
+        --amber: #b7791f;
+        --r: 6px;
+        --sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font: 14px/20px var(--sans);
+        font-variant-numeric: tabular-nums;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+      ul, ol { padding: 0; list-style: none; }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; opacity: 0.45; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+      code { font-family: var(--mono); font-size: 12px; }
+      .eyebrow { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+      .muted { color: var(--ink-2); }
+      .dim { color: var(--ink-3); }
+
+      /* ---- app frame ---- */
+      .app { height: 100%; display: grid; grid-template-rows: 56px 1fr; }
+      header.top { display: flex; align-items: center; gap: 24px; padding: 0 40px; border-bottom: 1px solid var(--line); background: var(--pane); }
+      header.top h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+      .meta-line { display: flex; gap: 16px; align-items: center; font-size: 12px; color: var(--ink-2); }
+      .meta-line code { color: var(--ink); }
+      .state-pill { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 500; text-transform: capitalize; }
+      .state-pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+      body[data-state='completed'] .state-pill i { background: var(--green); }
+      body[data-state='evaluating'] .state-pill i { background: var(--amber); }
+      .top .right { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+      .only-evaluating, .only-completed { display: none !important; }
+      body[data-state='evaluating'] .only-evaluating, body[data-state='completed'] .only-completed { display: inline-flex !important; }
+      .evaluating { align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); }
+      .btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--pane); font-weight: 500; transition: background 0.15s, border-color 0.15s; }
+      .btn:hover { background: #f4f4f5; }
+      .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .btn.primary:hover { background: #4338ca; }
+      .btn.quiet { border-color: transparent; padding: 0 8px; color: var(--ink-2); }
+      .btn.quiet:hover { color: var(--ink); }
+
+      .split { min-height: 0; display: grid; grid-template-columns: 55fr 45fr; }
+      .outline-col { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+      .col-head { height: 48px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; border-bottom: 1px solid var(--line); }
+      .col-head h2 { font-size: 14px; font-weight: 600; }
+      kbd { font: 11px var(--mono); padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-2); }
+
+      /* ---- outline ---- */
+      .outline { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 32px 32px; outline: none; scrollbar-width: thin; }
+      .outline:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+      .node { position: relative; display: grid; grid-template-columns: 16px 16px 1fr auto; column-gap: 8px; align-items: start; min-height: 28px; padding: 4px 8px; border-radius: var(--r); cursor: pointer; user-select: none; transition: background 0.15s; }
+      .node:hover { background: var(--hover); }
+      .node.sel { background: var(--accent-soft); }
+      .node.sel::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--accent); }
+      .node.cur { background: var(--accent-soft); }
+      .node.cur > .ttl { color: var(--accent); font-weight: 500; }
+      .node.dis { cursor: default; opacity: 0.45; }
+      .node.dis:hover { background: none; }
+      .node.root .ttl { font-weight: 600; }
+      .node .tri, .node .gl { width: 16px; height: 20px; display: grid; place-items: center; color: var(--ink-3); }
+      .node .tri svg { transition: transform 0.15s var(--ease); }
+      .node.open .tri svg { transform: rotate(90deg); }
+      .node .ttl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .node .ttl .dim { margin-left: 8px; }
+      .node .sub { display: block; font-size: 12px; line-height: 16px; color: var(--ink-3); font-weight: 400; white-space: normal; padding-bottom: 2px; }
+      .node .mt { font-size: 12px; line-height: 20px; color: var(--ink-2); white-space: nowrap; display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end; }
+      .guides { position: absolute; top: 0; bottom: 0; left: 0; pointer-events: none; }
+      .guides i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+      .gap { height: 8px; }
+      .stepno { font: 11px/20px var(--mono); color: var(--ink-3); }
+      .node.cur .stepno, .node.done .stepno { color: var(--accent); }
+      .node.todo .ttl { color: var(--ink-2); }
+
+      .dot { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 9px; font-weight: 600; vertical-align: -3px; margin-right: 8px; }
+      .tagdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: 1px; }
+      .tagdot.hardware { background: #8b5cf6; }
+      .tagdot.firmware { background: #0ea5e9; }
+      .tagdot.interaction { background: #f59e0b; }
+      .score { display: inline-flex; gap: 8px; }
+      .score span { display: inline-flex; align-items: center; gap: 4px; min-width: 28px; justify-content: flex-end; }
+
+      .spin { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--accent); border-right-color: transparent; animation: spin 0.9s linear infinite; display: inline-block; }
+      body[data-state='completed'] .live-spin { display: none; }
+
+      /* ---- right pane ---- */
+      .pane { min-height: 0; background: var(--pane); position: relative; overflow: hidden; }
+      .view { position: absolute; inset: 0; display: flex; flex-direction: column; animation: fade 0.2s var(--ease) both; }
+      .view[hidden] { display: none; }
+      .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 32px 40px 40px; scrollbar-width: thin; }
+      .detail { animation: fade 0.2s var(--ease) both; }
+      .detail > * + * { margin-top: 24px; }
+      .detail h3 { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; margin-top: 4px; }
+      .quote { color: var(--ink-2); padding-left: 16px; border-left: 2px solid var(--line); }
+      .facts { display: grid; grid-template-columns: 88px 1fr; gap: 8px 16px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .facts dt { font-size: 12px; color: var(--ink-3); }
+      .facts code { color: var(--ink); background: #f4f4f5; padding: 2px 6px; border-radius: 4px; }
+      .list > li + li { border-top: 1px solid var(--line); }
+      .lrow { width: 100%; display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: center; min-height: 36px; padding: 0 8px; border-radius: var(--r); transition: background 0.15s; }
+      .lrow:hover:not(:disabled) { background: var(--hover); }
+      .lrow .mt { font-size: 12px; color: var(--ink-2); text-align: right; }
+      .empty { color: var(--ink-3); padding-top: 64px; text-align: center; }
+      .empty .big { font-size: 28px; line-height: 36px; color: var(--ink); font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px; }
+
+      .who { display: flex; align-items: center; gap: 16px; }
+      .avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 600; font-size: 15px; flex: none; }
+      .who .name { font-size: 18px; line-height: 24px; font-weight: 600; }
+      .pill { margin-left: auto; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); text-transform: capitalize; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f4f4f5; color: var(--ink-2); }
+      .outcome { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; text-transform: capitalize; }
+      .reason { padding: 16px; border: 1px solid var(--line); border-radius: var(--r); }
+      .reason .eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--ink-2); }
+      .actions { display: flex; gap: 8px; }
+      .big-action { font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -0.02em; }
+
+      /* ---- sandbox in pane ---- */
+      .sb-head { height: 48px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 32px 0 24px; border-bottom: 1px solid var(--line); }
+      .sb-head .t { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .sb-head .k { font-size: 12px; color: var(--ink-2); display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+      .viewport { flex: 0 0 56%; position: relative; background: #f5f5f4; display: grid; place-items: center; overflow: hidden; cursor: grab; user-select: none; border-bottom: 1px solid var(--line); }
+      .viewport.dragging { cursor: grabbing; }
+      .stage { height: 76%; aspect-ratio: 180 / 320; transform-style: preserve-3d; transition: transform 0.3s var(--ease); position: relative; z-index: 1; }
+      .stage svg { width: 100%; height: 100%; display: block; }
+      .ground { position: absolute; left: 50%; bottom: 7%; width: 24%; height: 16px; transform: translateX(-50%); border-radius: 50%; background: rgba(0, 0, 0, 0.08); box-shadow: 0 0 16px 8px rgba(0, 0, 0, 0.04); }
+      .vp-hint { position: absolute; right: 16px; bottom: 12px; font-size: 12px; color: var(--ink-3); z-index: 2; }
+      .stage .key, .stage .screen text, .stage .fx { transition: transform 0.3s var(--ease), opacity 0.3s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .stage .key.pressed rect { fill: var(--accent); }
+      .stage .fx { opacity: 0; }
+      .viewport.after-move_button .key-select { transform: translateY(16px); }
+      .viewport.after-resize_text .screen text { transform: scale(1.5); }
+      .viewport.after-confirm_dialog .fx-dialog, .viewport.after-change_timeout .fx-timeout, .viewport.after-add_audio_cue .fx-audio { opacity: 1; }
+      .sb-info { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 32px 24px; scrollbar-width: thin; }
+      .sb-info > * + * { margin-top: 16px; }
+      .persona-line { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+      .persona-line .avatar { width: 32px; height: 32px; font-size: 13px; }
+      .persona-line .name { font-weight: 600; }
+      .stepcard { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+      .stepcard .big-action { font-size: 22px; line-height: 28px; margin: 4px 0; animation: fade 0.2s var(--ease) both; }
+      .stepcard q { display: block; color: var(--ink-2); animation: fade 0.25s var(--ease) both; }
+      .frame { width: 176px; }
+      .frame svg { display: block; width: 100%; border-radius: var(--r); }
+      .frame figcaption { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+      .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); padding: 2px; }
+      .seg button { padding: 4px 16px; border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--ink-2); transition: background 0.15s, color 0.15s; }
+      .seg button.on { background: var(--ink); color: #fff; }
+      .transport { height: 56px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 32px; border-top: 1px solid var(--line); }
+      .transport[hidden] { display: none; }
+      .play { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; flex: none; }
+      .play:hover { background: #4338ca; }
+      .transport input { flex: 1; accent-color: var(--accent); cursor: pointer; }
+      .transport .count { font-size: 12px; color: var(--ink-2); min-width: 56px; text-align: right; }
+
+      @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        .spin { animation: none !important; border-right-color: var(--accent); }
+      }
+      @media (max-width: 1240px) {
+        header.top, .col-head { padding: 0 32px; }
+        .outline { padding: 8px 16px 32px; }
+        .scroll { padding: 32px; }
+        .meta-line .opt, .col-head .eyebrow { display: none; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <div class="app">
+      <header class="top">
+        <h1>Infallible</h1>
+        <div class="meta-line">
+          <span>Run <code id="run-id"></code></span>
+          <span class="state-pill"><i></i><span id="run-state"></span></span>
+          <span class="opt">Started <span id="run-started"></span></span>
+          <span id="run-counts"></span>
+        </div>
+        <div class="right">
+          <span class="evaluating only-evaluating"><span class="spin"></span>Evaluating outcomes</span>
+          <button class="btn primary only-completed" id="see-sugs">See suggestions (<span id="n-sugs"></span>)</button>
+        </div>
+      </header>
+      <div class="split">
+        <section class="outline-col">
+          <div class="col-head">
+            <h2>Run outline</h2>
+            <span class="eyebrow"><kbd>↑</kbd> <kbd>↓</kbd> move · <kbd>→</kbd> <kbd>←</kbd> expand · <kbd>↵</kbd> open</span>
+          </div>
+          <div class="outline" id="outline" tabindex="0" role="tree" aria-label="Run outline"></div>
+        </section>
+        <section class="pane">
+          <div class="view" id="detail-view"><div class="scroll"><div class="detail" id="detail"></div></div></div>
+          <div class="view" id="sandbox" hidden>
+            <div class="sb-head">
+              <button class="btn quiet" id="sb-back">&larr; Back</button>
+              <span class="t" id="sb-title"></span>
+              <span class="k" id="sb-kind"></span>
+            </div>
+            <div class="viewport" id="viewport">
+              <div class="stage" id="stage"></div>
+              <div class="ground"></div>
+              <span class="vp-hint">Drag to orbit · scroll to zoom</span>
+            </div>
+            <div class="sb-info" id="sb-info"></div>
+            <div class="transport" id="transport" hidden>
+              <button class="play" id="play" aria-label="Play or pause">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path id="play-icon" d="M5 3.5v9M11 3.5v9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </button>
+              <input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub steps" />
+              <span class="count" id="count"></span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const completed = () => document.body.dataset.state === 'completed';
+      const running = () => document.body.dataset.state === 'running';
+
+      const ICON = {
+        tri: '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1.5 7 5l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        passed: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--green)" stroke-width="1.2"/><path d="m5.2 8.2 1.9 1.9 3.7-4" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        failed: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="none" stroke="var(--red)" stroke-width="1.2"/><path d="m5.8 5.8 4.4 4.4m0-4.4-4.4 4.4" stroke="var(--red)" stroke-width="1.5" stroke-linecap="round"/></svg>',
+        errored: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2 14.5 13.5h-13z" fill="none" stroke="var(--amber)" stroke-width="1.2" stroke-linejoin="round"/><path d="M8 6.5v3.2M8 11.6v.1" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/></svg>',
+        pending: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="var(--ink-3)" stroke-width="1.2" stroke-dasharray="2 2.4"/></svg>',
+        idle: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3" fill="var(--accent)"/></svg>',
+        folder: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2.5 4.5h4l1.5 1.5h5.5v6.5h-11z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+        people: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="6" cy="6" r="2.3" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M2 13c.6-2.3 2.1-3.4 4-3.4s3.4 1.1 4 3.4M10.5 4a2 2 0 0 1 0 4M12 9.8c1 .5 1.7 1.6 2 3.2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>',
+        bulb: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M6 12.5h4M6.5 14.5h3M8 2a4 4 0 0 0-2.3 7.3c.5.4.8.9.8 1.5V11h3v-.2c0-.6.3-1.1.8-1.5A4 4 0 0 0 8 2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+        ev: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 8h8m-3-3 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      };
+      const glyph = (st) => (st === 'active' ? (completed() ? ICON.idle : '<span class="spin live-spin"></span>') : st === 'done' ? ICON.passed : ICON[st] || ICON.pending);
+
+      const expanded = new Set(['g:tasks', 'g:personas']);
+      let sel = null;
+      let sb = null; // { kind, agentId, taskId, suggestionId }
+      let replay = { cursor: 0, playing: false, timer: null };
+      let after = false;
+
+      /* ---- tree: ids are kind:arg:arg… ---- */
+      const statusOf = (a, tid) => a.outcomes[tid] || (a.currentTaskId === tid ? 'active' : 'pending');
+      const showSugs = () => completed() || (sb && sb.kind === 'change');
+      const sugById = (id) => M.suggestions.find((s) => s.id === id);
+      function kids(id) {
+        const [k, x, y] = id.split(':');
+        if (id === 'g:tasks') return M.tasks.map((t) => 't:' + t.id);
+        if (id === 'g:personas') return M.agents.map((a) => 'p:' + a.id);
+        if (id === 'g:sugs') return M.suggestions.map((s) => 'sg:' + s.id);
+        if (k === 't') return M.agents.map((a) => `a:${x}:${a.id}`);
+        if (k === 'a') return M.historyOf(y, x).map((_, i) => `s:${x}:${y}:${i}`);
+        if (k === 'p') return M.tasks.map((t) => `pt:${x}:${t.id}`);
+        if (k === 'sg') return sugById(x).evidence.map((_, i) => `ev:${x}:${i}`);
+        return [];
+      }
+      function parentOf(id) {
+        const [k, x, y] = id.split(':');
+        return { t: 'g:tasks', a: 't:' + x, s: `a:${x}:${y}`, p: 'g:personas', pt: 'p:' + x, sg: 'g:sugs', ev: 'sg:' + x }[k] || null;
+      }
+      function visible() {
+        const out = [];
+        const walk = (id, d) => {
+          out.push({ id, d });
+          if (expanded.has(id)) kids(id).forEach((c) => walk(c, d + 1));
+        };
+        ['g:tasks', 'g:personas'].concat(showSugs() ? ['g:sugs'] : []).forEach((r) => walk(r, 0));
+        return out;
+      }
+      function disabled(id) {
+        const [k, x, y] = id.split(':');
+        if (k === 'a') return statusOf(M.agentById[y], x) === 'pending';
+        if (k === 'pt') return !M.historyOf(x, y).length;
+        return false;
+      }
+
+      function nodeParts(id) {
+        const [k, x, y, z] = id.split(':');
+        let gl = '', ttl = '', mt = '', sub = '';
+        if (k === 'g') {
+          gl = x === 'tasks' ? ICON.folder : x === 'personas' ? ICON.people : ICON.bulb;
+          ttl = { tasks: 'Tasks', personas: 'Personas', sugs: 'Suggestions' }[x];
+          mt = x === 'tasks' ? `${M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length} / ${M.tasks.length} done` : x === 'personas' ? `${M.agents.length}` : `${M.suggestions.length}`;
+        } else if (k === 't') {
+          gl = glyph(M.taskStatus(x));
+          ttl = esc(M.taskById[x].name);
+          mt = `${M.agents.filter((a) => x in a.outcomes).length}/${M.agents.length} scored`;
+        } else if (k === 'a') {
+          const a = M.agentById[y];
+          const p = M.personaOf(a);
+          const n = M.historyOf(y, x).length;
+          gl = glyph(statusOf(a, x));
+          ttl = `<span class="dot">${esc(p.name[0])}</span>${esc(p.name)}`;
+          mt = n ? `${n} steps` : '—';
+        } else if (k === 's') {
+          const st = M.historyOf(y, x)[+z];
+          gl = `<span class="stepno">${st.step}</span>`;
+          ttl = esc(st.action);
+          sub = `<span class="sub">${esc(st.reasoning)}</span>`;
+          mt = `<span class="dim">${st.at}</span>`;
+        } else if (k === 'p') {
+          const a = M.agentById[x];
+          const p = M.personaOf(a);
+          const t = M.taskById[a.currentTaskId];
+          gl = `<span class="dot" style="margin:0">${esc(p.name[0])}</span>`;
+          const cur = completed() ? 'done' : a.status === 'error' ? 'error' : t ? t.short : a.status;
+          ttl = `${esc(p.name)}<span class="dim">${p.age}</span><span class="dim">· ${esc(cur)}</span>`;
+          mt = `${a.status === 'working' && !completed() ? '<span class="spin live-spin"></span>' : ''}<span class="score"><span>${ICON.passed}${a.passed}</span><span>${ICON.failed}${a.failed + a.errored}</span></span>`;
+        } else if (k === 'pt') {
+          const n = M.historyOf(x, y).length;
+          gl = glyph(statusOf(M.agentById[x], y));
+          ttl = esc(M.taskById[y].short);
+          mt = n ? `${n} steps` : '—';
+        } else if (k === 'sg') {
+          const s = sugById(x);
+          gl = `<span class="tagdot ${s.category}"></span>`;
+          ttl = esc(s.title);
+          mt = s.category;
+        } else if (k === 'ev') {
+          const e = sugById(x).evidence[+y];
+          gl = ICON.ev;
+          ttl = `${esc(M.personaOf(M.agentById[e.agentId]).name)}<span class="dim">· ${esc(M.taskById[e.taskId].short)}</span>`;
+          mt = `§${e.step}`;
+        }
+        return { gl, ttl, mt, sub, root: k === 'g' };
+      }
+
+      function curStepId() {
+        if (!sb || sb.kind === 'change') return null;
+        const n = sb.kind === 'live' ? M.historyOf(sb.agentId, sb.taskId).length : replay.cursor;
+        return n ? `s:${sb.taskId}:${sb.agentId}:${n - 1}` : null;
+      }
+      function highlighted() {
+        const h = new Set();
+        if (!sb) return h;
+        if (sb.kind === 'change') h.add('sg:' + sb.suggestionId);
+        else h.add(`a:${sb.taskId}:${sb.agentId}`).add('p:' + sb.agentId).add(`pt:${sb.agentId}:${sb.taskId}`);
+        return h;
+      }
+
+      function renderOutline(scrollTo) {
+        const cur = curStepId();
+        const hl = highlighted();
+        const prefix = sb && sb.kind === 'replay' ? `s:${sb.taskId}:${sb.agentId}:` : null;
+        $('#outline').innerHTML = visible()
+          .map(({ id, d }, i) => {
+            const n = nodeParts(id);
+            const hasKids = kids(id).length > 0;
+            const open = expanded.has(id);
+            let cls = 'node';
+            if (n.root) cls += ' root';
+            if (open && hasKids) cls += ' open';
+            if (id === sel) cls += ' sel';
+            if (id === cur || hl.has(id)) cls += ' cur';
+            if (disabled(id)) cls += ' dis';
+            if (prefix && id.startsWith(prefix)) cls += +id.split(':')[3] < replay.cursor ? ' done' : ' todo';
+            const guides = Array.from({ length: d }, (_, g) => `<i style="left:${16 + g * 20}px"></i>`).join('');
+            const gap = n.root && i > 0 ? '<div class="gap"></div>' : '';
+            return `${gap}<div class="${cls}" data-id="${esc(id)}" role="treeitem" aria-level="${d + 1}"${hasKids ? ` aria-expanded="${open}"` : ''} aria-selected="${id === sel}" style="padding-left:${8 + d * 20}px"><span class="guides">${guides}</span><span class="tri">${hasKids ? ICON.tri : ''}</span><span class="gl">${n.gl}</span><span class="ttl">${n.ttl}${n.sub}</span><span class="mt">${n.mt}</span></div>`;
+          })
+          .join('');
+        const target = scrollTo || cur;
+        const el = target && $(`#outline [data-id="${target}"]`);
+        if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+
+      /* ---- header ---- */
+      function renderHeader() {
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-state').textContent = document.body.dataset.state;
+        $('#run-started').textContent = M.run.startedAt;
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#run-counts').textContent = `${M.agents.length} personas · ${M.tasks.length} tasks · ${done} done`;
+        $('#n-sugs').textContent = M.suggestions.length;
+      }
+
+      /* ---- detail pane ---- */
+      function personaCard(a) {
+        const p = M.personaOf(a);
+        return `<div class="who"><span class="avatar">${esc(p.name[0])}</span><div><div class="name">${esc(p.name)}</div><div class="muted">${p.age}, ${esc(p.gender)}</div></div><span class="pill">${esc(a.status)}</span></div>` +
+          (p.modifiers.length ? `<div class="chips" style="margin-top:16px">${p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('')}</div>` : `<p class="dim" style="margin-top:16px">No impairment modifiers.</p>`);
+      }
+      function attemptDetail(agentId, taskId) {
+        const a = M.agentById[agentId];
+        const t = M.taskById[taskId];
+        const st = statusOf(a, taskId);
+        const n = M.historyOf(agentId, taskId).length;
+        const live = st === 'active' && running() && a.status === 'working';
+        return `<p class="eyebrow">Attempt · ${esc(t.short)}</p>
+          <div>${personaCard(a)}</div>
+          <dl class="facts"><dt>Outcome</dt><dd><span class="outcome">${glyph(st)}${st === 'active' ? 'in progress' : st}</span></dd><dt>Steps</dt><dd>${n} of max ${t.maxSteps}</dd><dt>Task</dt><dd>${esc(t.name)}</dd></dl>
+          ${a.reasons[taskId] ? `<div class="reason"><div class="eyebrow">${glyph(st)}Why it ${st === 'errored' ? 'errored' : 'failed'}</div><p>${esc(a.reasons[taskId])}</p></div>` : ''}
+          <div class="actions">${live ? `<button class="btn primary" data-open="live" data-a="${agentId}" data-t="${taskId}">Watch live</button>` : ''}${n ? `<button class="btn${live ? '' : ' primary'}" data-open="replay" data-a="${agentId}" data-t="${taskId}">Open replay</button>` : ''}</div>`;
+      }
+      function renderDetail() {
+        const el = $('#detail');
+        el.style.animation = 'none';
+        void el.offsetWidth;
+        el.style.animation = '';
+        if (!sel) {
+          el.innerHTML = `<div class="empty"><div class="big">Select a row</div><p>Tasks, attempts and steps open here.<br />Walk the outline with the arrow keys.</p></div>`;
+          return;
+        }
+        const [k, x, y, z] = sel.split(':');
+        if (k === 'g') {
+          const name = { tasks: 'Tasks', personas: 'Personas', sugs: 'Suggestions' }[x];
+          el.innerHTML = `<div><p class="eyebrow">Group</p><h3>${name}</h3></div><p class="muted">${kids(sel).length} items. Press <kbd>→</kbd> to expand, or click a row.</p>`;
+        } else if (k === 't') {
+          const t = M.taskById[x];
+          el.innerHTML = `<div><p class="eyebrow">Task ${M.tasks.indexOf(t) + 1} of ${M.tasks.length} · ${M.taskStatus(x)}</p><h3>${esc(t.name)}</h3></div>
+            <p class="quote">${esc(t.description)}</p>
+            <dl class="facts"><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Success</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd>${t.maxSteps}</dd></dl>
+            <div><p class="eyebrow" style="margin-bottom:8px">Personas on this task</p><ul class="list">${M.agents
+              .map((a) => {
+                const st = statusOf(a, x);
+                const n = M.historyOf(a.id, x).length;
+                const p = M.personaOf(a);
+                return `<li><button class="lrow" data-open="agent" data-a="${a.id}" data-t="${x}"${st === 'pending' ? ' disabled' : ''}>${glyph(st)}<span><span class="dot">${esc(p.name[0])}</span>${esc(p.name)}</span><span class="mt">${n ? n + ' steps' : st}</span></button></li>`;
+              })
+              .join('')}</ul></div>`;
+        } else if (k === 'a') {
+          el.innerHTML = attemptDetail(y, x);
+        } else if (k === 'pt') {
+          el.innerHTML = attemptDetail(x, y);
+        } else if (k === 's') {
+          const steps = M.historyOf(y, x);
+          const st = steps[+z];
+          el.innerHTML = `<div><p class="eyebrow">Step ${st.step} of ${steps.length} · ${esc(M.personaOf(M.agentById[y]).name)} · ${esc(M.taskById[x].short)} · ${st.at}</p><div class="big-action" style="margin-top:8px">${esc(st.action)}</div></div>
+            <p class="quote">${esc(st.reasoning)}</p>
+            <div class="actions"><button class="btn primary" data-open="replay" data-a="${y}" data-t="${x}" data-s="${st.step}">Replay from here</button></div>`;
+        } else if (k === 'p') {
+          const a = M.agentById[x];
+          el.innerHTML = `<p class="eyebrow">Persona</p><div>${personaCard(a)}</div><p class="muted">${esc(M.personaOf(a).blurb)}</p>
+            <div class="actions"><button class="btn primary" data-open="agent" data-a="${x}">Open in sandbox</button></div>`;
+        } else if (k === 'sg' || k === 'ev') {
+          const s = sugById(x);
+          el.innerHTML = `<div><p class="eyebrow"><span class="tagdot ${s.category}"></span> ${s.category}</p><h3>${esc(s.title)}</h3></div><p class="muted">${esc(s.rationale)}</p>
+            <div class="actions"><button class="btn primary" data-open="change" data-s="${x}">Preview change</button></div>`;
+        }
+      }
+      $('#detail').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-open]');
+        if (!b || b.disabled) return;
+        const o = b.dataset.open;
+        if (o === 'agent') return openAgent(b.dataset.a, b.dataset.t || null);
+        if (o === 'change') return openSandbox({ kind: 'change', suggestionId: b.dataset.s });
+        openSandbox({ kind: o, agentId: b.dataset.a, taskId: b.dataset.t }, b.dataset.s ? +b.dataset.s : 0);
+      });
+
+      /* ---- outline interaction ---- */
+      function select(id, scroll) {
+        sel = id;
+        if (!sb) renderDetail();
+        renderOutline(scroll ? id : null);
+      }
+      function toggle(id, force) {
+        const open = force === undefined ? !expanded.has(id) : force;
+        if (open) expanded.add(id);
+        else expanded.delete(id);
+      }
+      function activate(id) {
+        if (disabled(id)) return;
+        const [k, x, y, z] = id.split(':');
+        if (k === 'g') {
+          toggle(id);
+          return select(id);
+        }
+        if (k === 't') {
+          toggle(id);
+          if (sb) closeSandbox(true);
+          return select(id);
+        }
+        if (k === 'a') {
+          if (sb) {
+            sel = id;
+            return openAgent(y, x);
+          }
+          if (sel === id) toggle(id);
+          return select(id);
+        }
+        if (k === 's') {
+          sel = id;
+          if (sb && sb.kind === 'replay' && sb.agentId === y && sb.taskId === x) return scrub(+z + 1);
+          if (sb) return openSandbox({ kind: 'replay', agentId: y, taskId: x }, +z + 1);
+          return select(id);
+        }
+        sel = id;
+        if (k === 'p') return openAgent(x, null);
+        if (k === 'pt') return openAgent(x, y);
+        if (k === 'sg') return openSandbox({ kind: 'change', suggestionId: x });
+        if (k === 'ev') {
+          const e = sugById(x).evidence[+y];
+          return openSandbox({ kind: 'replay', agentId: e.agentId, taskId: e.taskId }, e.step);
+        }
+      }
+      $('#outline').addEventListener('click', (e) => {
+        const n = e.target.closest('.node');
+        if (!n) return;
+        if (e.target.closest('.tri') && kids(n.dataset.id).length) {
+          toggle(n.dataset.id);
+          return renderOutline();
+        }
+        activate(n.dataset.id);
+      });
+      $('#outline').addEventListener('keydown', (e) => {
+        const rows = visible().map((r) => r.id);
+        let i = rows.indexOf(sel);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          i = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)));
+          return select(rows[i], true);
+        }
+        if (!sel) return;
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (kids(sel).length && !expanded.has(sel)) {
+            toggle(sel, true);
+            return select(sel, true);
+          }
+          if (expanded.has(sel) && kids(sel).length) return select(kids(sel)[0], true);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (expanded.has(sel) && kids(sel).length) {
+            toggle(sel, false);
+            return select(sel, true);
+          }
+          const p = parentOf(sel);
+          if (p) return select(p, true);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          activate(sel);
+        }
+      });
+
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (running() && a.status === 'working' && (!taskId || taskId === a.currentTaskId)) return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+        openSandbox({ kind: 'replay', agentId, taskId: target });
+      }
+
+      /* ---- sandbox (replaces the right pane; outline stays) ---- */
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+      function openSandbox(mode, atStep) {
+        clearInterval(replay.timer);
+        sb = mode;
+        after = false;
+        replay = { cursor: atStep || 0, playing: !atStep, timer: null };
+        if (mode.kind === 'change') {
+          expanded.add('g:sugs').add('sg:' + mode.suggestionId);
+        } else {
+          ['g:tasks', 't:' + mode.taskId, `a:${mode.taskId}:${mode.agentId}`, 'g:personas', 'p:' + mode.agentId].forEach((id) => expanded.add(id));
+        }
+        $('#detail-view').hidden = true;
+        $('#sandbox').hidden = false;
+        renderSandbox();
+        if (mode.kind === 'replay') startReplay();
+        renderOutline(mode.kind === 'change' ? 'sg:' + mode.suggestionId : `a:${mode.taskId}:${mode.agentId}`);
+      }
+      function closeSandbox(silent) {
+        clearInterval(replay.timer);
+        sb = null;
+        $('#sandbox').hidden = true;
+        $('#detail-view').hidden = false;
+        if (!silent) {
+          renderDetail();
+          renderOutline();
+        }
+      }
+      $('#sb-back').addEventListener('click', () => closeSandbox());
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sb) closeSandbox();
+      });
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((a) => a === 'press select')) return 'basal';
+        if (seen.some((a) => a.startsWith('hold up') || a === 'press up')) return 'bolus';
+        if (seen.some((a) => a === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderSandbox() {
+        const info = $('#sb-info');
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#viewport').className = 'viewport';
+        $('#stage').dataset.screen = '';
+
+        if (sb.kind === 'change') {
+          const s = sugById(sb.suggestionId);
+          $('#sb-title').textContent = s.title;
+          $('#sb-kind').innerHTML = `<span class="tagdot ${s.category}"></span>Suggestion ${M.suggestions.indexOf(s) + 1} of ${M.suggestions.length}`;
+          $('#stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+          injectFx();
+          info.innerHTML = `
+            <div class="seg"><button data-after="0" class="on">Before</button><button data-after="1">After</button></div>
+            <div><p class="eyebrow"><span class="tagdot ${s.category}"></span> ${s.category}</p><h3 style="font-size:18px;line-height:24px;font-weight:600;margin-top:4px">${esc(s.title)}</h3><p class="muted" style="margin-top:8px">${esc(s.rationale)}</p></div>
+            <p><code>${esc(s.change.type)}(${esc(JSON.stringify(s.change.params).replace(/[{}"]/g, '').replace(/,/g, ', '))})</code></p>
+            <div><p class="eyebrow" style="margin-bottom:8px">Evidence</p><ul class="list">${s.evidence
+              .map((e) => `<li><button class="lrow" data-ev-a="${e.agentId}" data-ev-t="${e.taskId}" data-ev-s="${e.step}">${ICON.ev}<span>${esc(M.personaOf(M.agentById[e.agentId]).name)} <span class="dim">· ${esc(M.taskById[e.taskId].short)}</span></span><span class="mt">§${e.step}</span></button></li>`)
+              .join('')}</ul></div>`;
+          const setAfter = (v) => {
+            after = v;
+            info.querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+            $('#viewport').className = 'viewport' + (after ? ' after-' + s.change.type : '');
+          };
+          info.querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(b.dataset.after === '1')));
+          info.querySelectorAll('[data-ev-a]').forEach((b) =>
+            b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evA, taskId: b.dataset.evT }, +b.dataset.evS)),
+          );
+          setTimeout(() => {
+            if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) setAfter(true);
+          }, 900);
+          return;
+        }
+
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const outcome = a.outcomes[sb.taskId];
+        $('#sb-title').textContent = t.name;
+        $('#sb-kind').innerHTML = sb.kind === 'live' ? '<span class="spin live-spin"></span>Live' : 'Replay';
+        info.innerHTML = `
+          <div class="persona-line"><span class="avatar">${esc(p.name[0])}</span><span><span class="name">${esc(p.name)}</span> <span class="muted">${p.age}, ${esc(p.gender)}</span></span>${p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('')}<span class="pill">${esc(a.status)}</span></div>
+          <div class="stepcard" id="stepcard"></div>
+          ${outcome === 'failed' || outcome === 'errored' ? `<div class="reason"><div class="eyebrow">${glyph(outcome)}${outcome === 'errored' ? 'Errored' : 'Failed'}</div><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>` : ''}`;
+        $('#scrub').max = stepsFor().length;
+        renderStep();
+      }
+
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const want = screenFor(shown, steps, t);
+        $('#stepcard').innerHTML = `<div><p class="eyebrow">${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${esc(t.short)}</p>
+            <div class="big-action">${cur ? esc(cur.action) : 'Waiting to start'}</div>
+            ${cur ? `<q>${esc(cur.reasoning)}</q>` : ''}</div>
+          ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: want })}<figcaption>heard confirmation beep</figcaption></figure>` : ''}`;
+        const stage = $('#stage');
+        const pressed = cur && cur.action.match(/^(press|hold) (\w+)/);
+        if (stage.dataset.screen !== want) {
+          stage.dataset.screen = want;
+          stage.innerHTML = M.pumpSvg({ screen: want });
+        }
+        stage.querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', !!pressed && k.dataset.button === pressed[2]));
+      }
+
+      function startReplay() {
+        clearInterval(replay.timer);
+        renderTransport();
+        replay.timer = setInterval(() => {
+          if (!replay.playing) return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            return renderTransport();
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+          renderOutline();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+        renderOutline();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const playing = replay.playing && replay.cursor < n;
+        $('#scrub').value = replay.cursor;
+        $('#count').textContent = `${replay.cursor} / ${n}`;
+        $('#play-icon').setAttribute('d', playing ? 'M5 3.5v9M11 3.5v9' : 'M5 3.5v9l7-4.5z');
+        $('#play-icon').setAttribute('fill', playing ? 'none' : 'currentColor');
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+          renderOutline();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      });
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      function injectFx() {
+        $('#stage svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#4f46e5"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#fff" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#818cf8" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+
+      /* cosmetic orbit */
+      (function orbit() {
+        const vp = $('#viewport');
+        const stage = $('#stage');
+        let drag = null;
+        let rx = -4;
+        let ry = 12;
+        let z = 1;
+        const apply = () => (stage.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => {
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          stage.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          drag = null;
+          vp.classList.remove('dragging');
+          stage.style.transition = '';
+        });
+        vp.addEventListener(
+          'wheel',
+          (e) => {
+            e.preventDefault();
+            z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+            apply();
+          },
+          { passive: false },
+        );
+      })();
+
+      $('#see-sugs').addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+
+      function renderAll() {
+        renderHeader();
+        if (sb && sb.kind !== 'change') renderSandbox();
+        else if (!sb) renderDetail();
+        renderOutline();
+      }
+
+      /* mock controls */
+      document.addEventListener('mock:state', () => {
+        if (!showSugs()) expanded.delete('g:sugs');
+        renderAll();
+      });
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') return closeSandbox();
+        if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+        openSandbox(Object.assign({ kind: k }, M.defaults[k]));
+      });
+
+      renderAll();
+      M.mountControls();
+    </script>
+  </body>
+</html>

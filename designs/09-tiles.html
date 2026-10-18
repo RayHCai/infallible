@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiles · Infallible design 09</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      /* 09 · Tiles — a wall of live pumps on frosted glass; click a tile and it zooms into the sandbox. */
+      :root {
+        --bg1: #0f172a;
+        --bg2: #1e293b;
+        --glass: rgba(255, 255, 255, 0.07);
+        --glass-2: rgba(255, 255, 255, 0.1);
+        --line: rgba(255, 255, 255, 0.12);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --text: #e2e8f0;
+        --text-2: #94a3b8;
+        --text-3: #64748b;
+        --cyan: #38bdf8;
+        --green: #34d399;
+        --red: #f87171;
+        --amber: #fbbf24;
+        --violet: #a78bfa;
+        --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+        --r: 12px;
+        --s2: 8px;
+        --s3: 12px;
+        --s4: 16px;
+        --s5: 24px;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        overflow: hidden;
+        color: var(--text);
+        font: 13px/1.5 var(--sans);
+        background: radial-gradient(1200px 700px at 20% -10%, rgba(56, 189, 248, 0.12), transparent 60%),
+          radial-gradient(900px 600px at 110% 110%, rgba(167, 139, 250, 0.1), transparent 60%),
+          linear-gradient(160deg, var(--bg1), var(--bg2));
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, p, ul, ol, dl, dd { margin: 0; }
+      ul, ol { padding: 0; list-style: none; }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; opacity: 0.4; }
+      :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+      code, .mono { font-family: var(--mono); font-size: 11.5px; }
+      .num { font-variant-numeric: tabular-nums; }
+      .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+      .glass {
+        background: var(--glass);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        backdrop-filter: blur(14px) saturate(140%);
+        -webkit-backdrop-filter: blur(14px) saturate(140%);
+      }
+      .only-evaluating, .only-completed { display: none !important; }
+      body[data-state='evaluating'] .only-evaluating, body[data-state='completed'] .only-completed { display: inline-flex !important; }
+
+      /* ---- top bar ---- */
+      .bar { position: relative; z-index: 3; display: flex; align-items: center; gap: var(--s4); height: 56px; margin: var(--s3) var(--s4) 0; padding: 0 var(--s4); }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+      .brand svg { filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6)); }
+      .sep { width: 1px; height: 22px; background: var(--line); }
+      .meta { display: flex; gap: var(--s4); color: var(--text-2); font-size: 12px; align-items: center; white-space: nowrap; }
+      .meta b { color: var(--text); font-weight: 600; }
+      .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: rgba(56, 189, 248, 0.12); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.3); text-transform: capitalize; }
+      .pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; animation: blink 1.6s ease-in-out infinite; }
+      body[data-state='evaluating'] .bar .pill { color: var(--amber); background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.3); }
+      body[data-state='completed'] .bar .pill { color: var(--green); background: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.3); }
+      body:not([data-state='running']) .pill i { animation: none; }
+      .dots { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+      .dot { position: relative; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; transition: background 0.2s var(--ease); }
+      .dot:hover, .dot.on { background: var(--glass-2); }
+      .dot.on { box-shadow: inset 0 0 0 1px var(--line-2); }
+      .dot span { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--text-3); }
+      .dot.done span { background: var(--green); border-color: var(--green); box-shadow: 0 0 10px rgba(52, 211, 153, 0.7); }
+      .dot.active span { border-color: var(--cyan); background: radial-gradient(circle, var(--cyan) 35%, transparent 40%); box-shadow: 0 0 10px rgba(56, 189, 248, 0.6); }
+      .dot .tip {
+        position: absolute; top: 34px; left: 50%; transform: translate(-50%, -4px); opacity: 0; pointer-events: none; font-style: normal;
+        white-space: nowrap; padding: 5px 9px; border-radius: 8px; font-size: 11.5px; background: #0b1220; border: 1px solid var(--line); color: var(--text);
+        transition: opacity 0.15s, transform 0.15s var(--ease);
+      }
+      .dot:last-of-type .tip { left: auto; right: 0; transform: translateY(-4px); }
+      .dot:hover .tip, .dot:focus-visible .tip { opacity: 1; transform: translate(-50%, 0); }
+      .dot:last-of-type:hover .tip, .dot:last-of-type:focus-visible .tip { transform: none; }
+      .dots .count { margin-left: 6px; color: var(--text-2); font-size: 12px; white-space: nowrap; }
+      .cta {
+        align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-weight: 600; font-size: 12.5px; white-space: nowrap;
+        background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(167, 139, 250, 0.25)); border: 1px solid rgba(167, 139, 250, 0.45);
+        box-shadow: 0 0 24px rgba(167, 139, 250, 0.25); transition: transform 0.2s var(--ease), box-shadow 0.2s;
+      }
+      .cta:hover { transform: translateY(-1px); box-shadow: 0 0 32px rgba(167, 139, 250, 0.45); }
+      .evaluating { align-items: center; gap: 8px; color: var(--amber); font-weight: 600; font-size: 12.5px; }
+      .ring-spin { display: inline-block; flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.9s linear infinite; }
+
+      /* ---- tile wall ---- */
+      #wall { position: absolute; inset: 84px var(--s4) var(--s4); display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: 1fr 1fr; gap: var(--s4); }
+      .tile { grid-column: span 2; position: relative; display: flex; flex-direction: column; min-height: 0; padding: var(--s3) var(--s4) var(--s4); transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), border-color 0.2s, box-shadow 0.3s; }
+      .tile:nth-child(4) { grid-column: 2 / span 2; }
+      .tile:hover { border-color: var(--line-2); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(56, 189, 248, 0.15); }
+      .tile.has-fail { box-shadow: 0 0 30px rgba(248, 113, 113, 0.08); }
+      body.zooming .tile { opacity: 0; transform: scale(0.96); pointer-events: none; }
+      body.zooming .bar { opacity: 0; pointer-events: none; }
+      .bar { transition: opacity 0.3s var(--ease); }
+      .tile .open { position: absolute; inset: 0; border-radius: var(--r); z-index: 1; }
+      .tile-head { display: flex; align-items: center; gap: 10px; }
+      .avatar {
+        flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; font-weight: 700; font-size: 13px;
+        background: linear-gradient(135deg, hsl(var(--h) 80% 60% / 0.35), hsl(var(--h) 80% 50% / 0.12)); border: 1px solid hsl(var(--h) 80% 70% / 0.4); color: hsl(var(--h) 90% 85%);
+      }
+      .tile-head .who { min-width: 0; flex: 1; }
+      .tile-head .name { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .tile-head .name small { color: var(--text-3); font-weight: 500; margin-left: 6px; font-size: 12px; }
+      .tile-head .task { font-size: 11.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
+      .tile-head .task .ring-spin { width: 9px; height: 9px; border-width: 1.5px; color: var(--cyan); }
+      body:not([data-state='running']) .tile .ring-spin { display: none; }
+      .sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: blink 2s ease-in-out infinite; }
+      body[data-state='evaluating'] .sdot { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+      body[data-state='completed'] .sdot { background: var(--green); box-shadow: 0 0 10px var(--green); animation: none; }
+      .mini {
+        position: relative; flex: 1; min-height: 0; margin: var(--s3) 0 var(--s2); border-radius: 10px; overflow: hidden;
+        display: grid; place-items: center; perspective: 700px;
+        background: radial-gradient(ellipse at 50% 85%, rgba(56, 189, 248, 0.14), transparent 60%), rgba(2, 6, 23, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .mini::after { content: ''; position: absolute; left: 32%; right: 32%; bottom: 7%; height: 10px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); filter: blur(6px); }
+      .mini .pumpwrap { height: 82%; aspect-ratio: 180 / 320; transform: rotateX(var(--rx, 6deg)) rotateY(var(--ry, -10deg)); transition: transform 0.4s var(--ease); position: relative; z-index: 1; }
+      .mini svg, .hero-pump svg { width: 100%; height: 100%; display: block; }
+      .key rect { transition: fill 0.15s; }
+      .key.pressed rect { fill: var(--cyan); }
+      .key.pressed text { fill: #04111d; }
+      .mini .pulse { position: absolute; inset: 0; border-radius: 10px; pointer-events: none; }
+      .tile.ping .pulse { animation: ping 1.1s var(--ease); }
+      .ticker { position: relative; height: 20px; overflow: hidden; font-size: 12px; font-family: var(--mono); color: var(--text); }
+      .ticker div { position: absolute; inset: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ticker div::before { content: '› '; color: var(--cyan); }
+      .ticker .in { animation: tick-in 0.45s var(--ease) both; }
+      .ticker .out { animation: tick-out 0.45s var(--ease) both; }
+      body:not([data-state='running']) .ticker { color: var(--text-3); }
+      .foot { display: flex; align-items: center; gap: var(--s3); margin-top: var(--s2); }
+      .prog { flex: 1; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+      .prog i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--violet)); box-shadow: 0 0 8px var(--cyan); transition: width 0.6s var(--ease); }
+      .frac { font-size: 11px; color: var(--text-3); }
+      .tally { display: flex; gap: 10px; font-size: 11.5px; color: var(--text-2); white-space: nowrap; }
+      .tally b { font-weight: 600; }
+      .tally .p b { color: var(--green); }
+      .tally .f b { color: var(--red); }
+
+      /* ---- task drawer ---- */
+      #scrim { position: fixed; inset: 0; z-index: 6; background: rgba(2, 6, 23, 0.45); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+      #scrim.on { opacity: 1; pointer-events: auto; }
+      #drawer {
+        position: fixed; z-index: 7; top: var(--s3); right: var(--s3); bottom: var(--s3); width: 420px; max-width: 46vw;
+        display: flex; flex-direction: column; padding: var(--s5); gap: var(--s4); overflow-y: auto; visibility: hidden;
+        background: rgba(15, 23, 42, 0.82); transform: translateX(110%); transition: transform 0.4s var(--ease), visibility 0s 0.4s;
+        box-shadow: -20px 0 60px rgba(0, 0, 0, 0.4); scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+      }
+      #drawer.on { transform: none; visibility: visible; transition: transform 0.4s var(--ease); }
+      .drawer-head { display: flex; justify-content: space-between; align-items: center; }
+      .x { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--text-2); }
+      .x:hover { background: var(--glass-2); color: var(--text); }
+      #drawer h2 { font-size: 20px; line-height: 1.25; font-weight: 600; letter-spacing: -0.01em; }
+      .quote { color: var(--text-2); font-style: italic; padding-left: var(--s3); border-left: 2px solid rgba(56, 189, 248, 0.5); }
+      .facts { display: grid; grid-template-columns: 80px 1fr; gap: 10px var(--s3); padding: var(--s3); border-radius: 10px; background: rgba(255, 255, 255, 0.04); }
+      .facts dt { font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); padding-top: 2px; }
+      .facts code { color: var(--cyan); word-break: break-word; }
+      .orow { width: 100%; display: grid; grid-template-columns: 30px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; transition: background 0.2s; }
+      .orow:hover:not(:disabled) { background: var(--glass-2); }
+      .orow .steps-n { font-size: 11.5px; color: var(--text-3); }
+      .state-tag { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); color: var(--text-3); }
+      .state-tag.passed { color: var(--green); background: rgba(52, 211, 153, 0.12); }
+      .state-tag.failed { color: var(--red); background: rgba(248, 113, 113, 0.12); }
+      .state-tag.errored { color: var(--amber); background: rgba(251, 191, 36, 0.12); }
+      .state-tag.active { color: var(--cyan); background: rgba(56, 189, 248, 0.12); }
+
+      /* ---- sandbox ---- */
+      #sandbox { position: fixed; inset: 0; z-index: 5; display: grid; grid-template-rows: 68px 1fr auto; }
+      #sandbox[hidden] { display: none; }
+      .sb-head { display: flex; align-items: center; gap: var(--s4); padding: 0 var(--s4); margin: var(--s3) var(--s4) 0; }
+      .back { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 8px; font-weight: 600; font-size: 12.5px; color: var(--text-2); }
+      .back:hover { background: var(--glass-2); color: var(--text); }
+      .back kbd { font: 10px var(--mono); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); color: var(--text-3); }
+      .sb-head h2 { font-size: 14px; font-weight: 600; flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .kind { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--text-2); white-space: nowrap; }
+      .kind.live { color: var(--red); border-color: rgba(248, 113, 113, 0.4); box-shadow: 0 0 14px rgba(248, 113, 113, 0.25); }
+      .kind.live::before { content: '● '; }
+      .sb-body { position: relative; min-height: 0; display: grid; grid-template-columns: 300px 1fr 260px; gap: var(--s4); padding: var(--s4); }
+      .side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s3); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+      .side > .card { animation: card-in 0.5s var(--ease) both; }
+      .side > .card:nth-child(2) { animation-delay: 0.06s; }
+      .side > .card:nth-child(3) { animation-delay: 0.12s; }
+      .card { padding: var(--s4); flex-shrink: 0; }
+      .card .eyebrow { display: block; margin-bottom: var(--s2); }
+      .who { display: flex; gap: var(--s3); align-items: center; }
+      .who .avatar { width: 40px; height: 40px; font-size: 16px; border-radius: 11px; }
+      .who h3 { font-size: 15px; font-weight: 600; }
+      .who .sub { color: var(--text-2); font-size: 12px; }
+      .who .pill { margin-left: auto; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s3); }
+      .chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: rgba(167, 139, 250, 0.12); border: 1px solid rgba(167, 139, 250, 0.3); color: #ddd6fe; transition: box-shadow 0.3s; }
+      .chip.hot { box-shadow: 0 0 12px rgba(167, 139, 250, 0.6); }
+      .chip.none { opacity: 0.55; }
+      .action { font-size: 22px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; margin: 2px 0 var(--s2); animation: tick-in 0.4s var(--ease) both; }
+      .reasoning { display: block; color: var(--text-2); font-style: italic; }
+      .reasoning::before { content: '\201C'; }
+      .reasoning::after { content: '\201D'; }
+      .frame { margin: var(--s3) 0 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+      .frame svg { display: block; width: 100%; }
+      .frame figcaption { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2); padding: 6px 10px; background: rgba(0, 0, 0, 0.3); }
+      .frame figcaption::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+      .failure { border-color: rgba(248, 113, 113, 0.45); background: rgba(248, 113, 113, 0.08); box-shadow: 0 0 36px rgba(248, 113, 113, 0.22), inset 0 0 20px rgba(248, 113, 113, 0.06); }
+      .failure .eyebrow { color: var(--red); }
+      .failure.errored { border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.07); box-shadow: 0 0 36px rgba(251, 191, 36, 0.18); }
+      .failure.errored .eyebrow { color: var(--amber); }
+      .trow { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; transition: background 0.2s; }
+      .trow:hover:not(:disabled) { background: var(--glass-2); }
+      .trow.on { background: rgba(56, 189, 248, 0.12); box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35); }
+      .trow .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .trow .n { color: var(--text-3); font-size: 11px; }
+      .g { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; border: 1.5px solid var(--text-3); color: transparent; }
+      .g.passed { background: var(--green); border-color: var(--green); color: #052e1c; }
+      .g.failed { background: var(--red); border-color: var(--red); color: #3b0a0a; }
+      .g.errored { background: var(--amber); border-color: var(--amber); color: #3b2a05; }
+      .g.active { border-color: var(--cyan); border-right-color: transparent; animation: spin 0.9s linear infinite; }
+      body:not([data-state='running']) .g.active { animation: none; border-right-color: var(--cyan); }
+
+      /* hero viewport */
+      .vp { position: relative; min-height: 0; display: grid; place-items: center; cursor: grab; user-select: none; overflow: hidden; border-radius: 16px; perspective: 1200px; }
+      .vp.dragging { cursor: grabbing; }
+      .vp::before {
+        content: ''; position: absolute; left: -50%; right: -50%; bottom: -10%; height: 60%;
+        background: repeating-linear-gradient(0deg, transparent 0 39px, rgba(56, 189, 248, 0.12) 39px 40px), repeating-linear-gradient(90deg, transparent 0 39px, rgba(56, 189, 248, 0.12) 39px 40px);
+        transform: perspective(500px) rotateX(62deg); transform-origin: bottom;
+        mask-image: linear-gradient(to top, #000, transparent 85%); -webkit-mask-image: linear-gradient(to top, #000, transparent 85%);
+      }
+      .vp::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(2, 6, 23, 0.55)); }
+      .flip { position: relative; z-index: 1; height: 74%; aspect-ratio: 180 / 320; transform-origin: 0 0; }
+      .flip::after { content: ''; position: absolute; left: 10%; right: 10%; bottom: -6%; height: 18px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); filter: blur(10px); z-index: -1; }
+      .hero-pump { width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.6s var(--ease); filter: drop-shadow(0 0 40px rgba(56, 189, 248, 0.18)); }
+      .hero-pump .key, .hero-pump .screen text, .hero-pump .fx { transition: transform 0.7s var(--ease), opacity 0.5s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .hero-pump .fx { opacity: 0; }
+      .after-move_button .key-select { transform: translateY(16px); }
+      .after-resize_text .screen text { transform: scale(1.5); }
+      .after-confirm_dialog .fx-dialog, .after-change_timeout .fx-timeout, .after-add_audio_cue .fx-audio { opacity: 1; }
+      .vp .hint { position: absolute; z-index: 2; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--text-3); padding: 4px 10px; border-radius: 999px; background: rgba(2, 6, 23, 0.4); white-space: nowrap; }
+      .vp .axes { position: absolute; z-index: 2; top: 14px; left: 14px; font: 10px var(--mono); color: var(--text-3); }
+
+      /* transport */
+      .transport { margin: 0 var(--s4) var(--s4); padding: var(--s3) var(--s4); display: grid; grid-template-columns: auto auto 1fr; gap: var(--s2) var(--s4); align-items: center; animation: card-in 0.5s var(--ease) 0.1s both; }
+      .transport[hidden] { display: none; }
+      .play { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, var(--cyan), var(--violet)); color: #04111d; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4); transition: transform 0.2s var(--ease); }
+      .play:hover { transform: scale(1.07); }
+      .pos { font-size: 12px; color: var(--text-2); min-width: 54px; }
+      input[type='range'] { width: 100%; accent-color: var(--cyan); cursor: pointer; }
+      .steps { grid-column: 1 / -1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+      .steps button { flex-shrink: 0; padding: 5px 10px; border-radius: 8px; font: 11.5px var(--mono); color: var(--text-3); background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); transition: all 0.2s var(--ease); white-space: nowrap; }
+      .steps button sup { font-size: 9px; margin-right: 5px; opacity: 0.7; }
+      .steps button.done { color: var(--text); background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.25); }
+      .steps button.next { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 12px rgba(56, 189, 248, 0.35); }
+      .steps button:hover { border-color: var(--line-2); color: var(--text); }
+
+      /* change mode: suggestions orbit the pump */
+      .orbit { position: absolute; inset: var(--s4); display: none; pointer-events: none; }
+      .orbit > * { pointer-events: auto; }
+      .sb-body.change { grid-template-columns: 1fr; }
+      .sb-body.change .side { display: none; }
+      .sb-body.change .orbit { display: block; }
+      .sb-body.change .vp { width: 36%; min-width: 260px; height: 100%; justify-self: center; }
+      .sb-body.change .flip { height: 64%; }
+      .ocard { position: absolute; width: min(300px, 28%); padding: var(--s3) var(--s4); z-index: 2; transition: transform 0.45s var(--ease), box-shadow 0.3s, border-color 0.3s, opacity 0.3s; opacity: 0.8; animation: card-in 0.5s var(--ease) both; }
+      .ocard:hover { opacity: 1; border-color: var(--line-2); }
+      .ocard.on { opacity: 1; z-index: 4; transform: scale(1.05); background: rgba(30, 41, 59, 0.88); border-color: rgba(56, 189, 248, 0.45); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(56, 189, 248, 0.2); }
+      .ocard .pick { display: block; width: 100%; }
+      .ocard h3 { font-size: 13.5px; font-weight: 600; margin-top: 6px; line-height: 1.3; }
+      .ocard.on h3 { font-size: 16px; }
+      .ocard .idx { float: right; font-size: 11px; color: var(--text-3); }
+      .ocard .more { display: none; margin-top: var(--s2); }
+      .ocard.on .more { display: block; }
+      .ocard .more p { color: var(--text-2); }
+      .ocard .ctype { margin: var(--s2) 0; padding: 6px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); color: var(--cyan); word-break: break-word; }
+      .ev { width: 100%; display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; font-size: 12px; line-height: 1.3; }
+      .ev:hover { background: var(--glass-2); }
+      .ev .avatar { width: 24px; height: 24px; font-size: 11px; border-radius: 7px; }
+      .ev small { color: var(--text-3); }
+      .ev .mono { color: var(--cyan); margin-left: auto; }
+      .tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+      .tag.hardware { color: #f0abfc; background: rgba(240, 171, 252, 0.12); box-shadow: 0 0 10px rgba(240, 171, 252, 0.2); }
+      .tag.firmware { color: var(--cyan); background: rgba(56, 189, 248, 0.12); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+      .tag.interaction { color: var(--green); background: rgba(52, 211, 153, 0.12); box-shadow: 0 0 10px rgba(52, 211, 153, 0.2); }
+      .ba { position: absolute; z-index: 3; bottom: 5%; left: 50%; transform: translateX(-50%); display: none; padding: 3px; border-radius: 999px; }
+      .sb-body.change .ba { display: inline-flex; }
+      .ba button { padding: 6px 18px; border-radius: 999px; font-weight: 600; font-size: 12px; color: var(--text-2); transition: background 0.25s var(--ease), color 0.25s; }
+      .ba button.on { background: rgba(255, 255, 255, 0.9); color: #0f172a; }
+      .sb-body.change .hint, .sb-body.change .axes { display: none; }
+
+      #sandbox.enter .sb-head, #sandbox.enter .vp::before { animation: fade-in 0.45s var(--ease) 0.15s both; }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes blink { 50% { opacity: 0.35; } }
+      @keyframes ping { 0% { box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.75), inset 0 0 30px rgba(56, 189, 248, 0.25); } 100% { box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0), inset 0 0 0 rgba(56, 189, 248, 0); } }
+      @keyframes tick-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @keyframes tick-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-12px); } }
+      @keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
+      @keyframes fade-in { from { opacity: 0; } }
+      @media (max-width: 1240px) {
+        .sb-body { grid-template-columns: 270px 1fr 230px; }
+        .meta .hide-sm { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <header class="bar glass">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2" y="2" width="7" height="7" rx="2" fill="#38bdf8" /><rect x="11" y="2" width="7" height="7" rx="2" fill="#a78bfa" opacity=".8" /><rect x="2" y="11" width="7" height="7" rx="2" fill="#a78bfa" opacity=".6" /><rect x="11" y="11" width="7" height="7" rx="2" fill="#38bdf8" opacity=".4" /></svg>
+        Infallible
+      </div>
+      <span class="sep"></span>
+      <div class="meta">
+        <span>Run <code id="run-id"></code></span>
+        <span class="pill"><i></i><span id="run-state"></span></span>
+        <span class="hide-sm">Started <b class="num" id="run-started"></b></span>
+        <span><b class="num" id="n-agents"></b> personas · <b class="num" id="n-tasks"></b> tasks</span>
+      </div>
+      <span class="evaluating only-evaluating"><span class="ring-spin"></span>Evaluating</span>
+      <button class="cta only-completed" id="see-sugg">See suggestions (<span class="num" id="n-sugg"></span>) &rarr;</button>
+      <nav class="dots" id="dots" aria-label="Tasks"></nav>
+    </header>
+
+    <main id="wall"></main>
+
+    <div id="scrim"></div>
+    <aside id="drawer" class="glass" aria-label="Task detail"></aside>
+
+    <section id="sandbox" hidden>
+      <header class="sb-head glass">
+        <button class="back" id="sb-back"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>Wall <kbd>Esc</kbd></button>
+        <h2 id="sb-title"></h2>
+        <span class="kind" id="sb-kind"></span>
+      </header>
+      <div class="sb-body" id="sb-body">
+        <aside class="side" id="sb-left"></aside>
+        <div class="vp" id="vp">
+          <span class="axes">x · y · z</span>
+          <div class="flip" id="flip"><div class="hero-pump" id="stage"></div></div>
+          <div class="ba glass" id="ba"><button data-after="0">Before</button><button data-after="1">After</button></div>
+          <span class="hint">Drag to orbit · scroll to zoom</span>
+        </div>
+        <aside class="side" id="sb-right"></aside>
+        <div class="orbit" id="orbit"></div>
+      </div>
+      <footer class="transport glass" id="transport" hidden>
+        <button class="play" id="play" aria-label="Play or pause"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path id="play-icon" d="M5 3.5v9M11 3.5v9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+        <span class="pos num" id="pos"></span>
+        <input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub steps" />
+        <ol class="steps" id="steps"></ol>
+      </footer>
+    </section>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const hue = { 'a-control': 200, 'a-routine': 160, 'a-lowvision': 265, 'a-teen': 30, 'a-tremor': 330 };
+      const sym = (st) => (st === 'passed' ? '✓' : st === 'failed' || st === 'errored' ? '✕' : '');
+      const g = (st) => `<span class="g ${st}">${sym(st)}</span>`;
+      const avatar = (a, p) => `<span class="avatar" style="--h:${hue[a.id] || 200}">${esc(p.name[0])}</span>`;
+      const state = () => document.body.dataset.state;
+      const pressedOf = (step) => {
+        const m = step && step.action.match(/^(press|hold) (\w+)/);
+        return m ? m[2] : null;
+      };
+
+      let openTask = null;
+      let sb = null; // { kind, agentId, taskId, suggestionId }
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+      const tick = {}; // agentId -> cursor into its current task history
+
+      /* ---- top bar ---- */
+      function renderBar() {
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-state').textContent = state();
+        $('#run-started').textContent = M.run.startedAt;
+        $('#n-agents').textContent = M.agents.length;
+        $('#n-tasks').textContent = M.tasks.length;
+        $('#n-sugg').textContent = M.suggestions.length;
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#dots').innerHTML =
+          M.tasks
+            .map((t, i) => `<button class="dot ${M.taskStatus(t.id)} ${openTask === t.id ? 'on' : ''}" data-task="${t.id}" aria-label="${esc(t.name)}"><span></span><em class="tip">${i + 1}. ${esc(t.name)} · ${M.taskStatus(t.id)}</em></button>`)
+            .join('') + `<span class="count num">${done}/${M.tasks.length} done</span>`;
+        $('#dots').querySelectorAll('[data-task]').forEach((b) => b.addEventListener('click', () => toggleDrawer(b.dataset.task === openTask ? null : b.dataset.task)));
+      }
+      $('#see-sugg').addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+
+      /* ---- tile wall ---- */
+      function renderWall() {
+        const completed = state() === 'completed';
+        $('#wall').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const t = M.taskById[a.currentTaskId];
+            const scored = Object.keys(a.outcomes).length;
+            const hist = M.historyOf(a.id, a.currentTaskId);
+            const step = hist[tick[a.id] ?? hist.length - 1];
+            const last = completed ? 'all tasks scored' : step ? step.action : 'waiting';
+            const sub = completed ? 'done' : a.status === 'error' ? esc(a.lastError || 'error') : `<span class="ring-spin"></span>${esc(t ? t.short : a.status)}`;
+            return `<article class="tile glass ${a.failed + a.errored ? 'has-fail' : ''}" data-agent="${a.id}">
+              <button class="open" data-open aria-label="Open ${esc(p.name)}"></button>
+              <div class="tile-head">${avatar(a, p)}<div class="who"><div class="name">${esc(p.name)}<small class="num">${p.age}</small></div><div class="task">${sub}</div></div><span class="sdot" title="${esc(a.status)}"></span></div>
+              <div class="mini"><div class="pumpwrap">${M.pumpSvg({ screen: a.currentTaskId === 't-alarm' ? 'alarm' : 'home', pressed: completed ? null : pressedOf(step) })}</div><span class="pulse"></span></div>
+              <div class="ticker"><div>${esc(last)}</div></div>
+              <div class="foot"><div class="prog"><i style="width:${(scored / M.tasks.length) * 100}%"></i></div><span class="frac num">${scored}/${M.tasks.length}</span><span class="tally num"><span class="p"><b>${a.passed}</b> pass</span><span class="f"><b>${a.failed + a.errored}</b> fail</span></span></div>
+            </article>`;
+          })
+          .join('');
+        $('#wall').querySelectorAll('.tile').forEach((tile) => {
+          const wrap = $('.pumpwrap', tile);
+          tile.addEventListener('mousemove', (e) => {
+            const r = tile.getBoundingClientRect();
+            wrap.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - 0.5) * 22}deg`);
+            wrap.style.setProperty('--rx', `${-((e.clientY - r.top) / r.height - 0.5) * 14}deg`);
+          });
+          tile.addEventListener('mouseleave', () => {
+            wrap.style.removeProperty('--rx');
+            wrap.style.removeProperty('--ry');
+          });
+          $('[data-open]', tile).addEventListener('click', () => openAgent(tile.dataset.agent, null, wrap));
+        });
+      }
+
+      // Simulated live steps: each tile lands a step every few seconds, staggered.
+      M.agents.forEach((a, i) => setTimeout(() => setInterval(() => landStep(a), 3400 + i * 270), 600 + i * 700));
+      function landStep(a) {
+        if (state() !== 'running' || sb) return;
+        const tile = $(`.tile[data-agent="${a.id}"]`);
+        const hist = M.historyOf(a.id, a.currentTaskId);
+        if (!tile || !hist.length) return;
+        tick[a.id] = ((tick[a.id] ?? hist.length - 1) + 1) % hist.length;
+        const step = hist[tick[a.id]];
+        const tk = $('.ticker', tile);
+        tk.querySelectorAll('div').forEach((d) => {
+          d.className = 'out';
+          setTimeout(() => d.remove(), 450);
+        });
+        tk.insertAdjacentHTML('beforeend', `<div class="in">${esc(step.action)}</div>`);
+        const key = pressedOf(step);
+        tile.querySelectorAll('.key').forEach((k) => k.classList.toggle('pressed', k.dataset.button === key));
+        tile.classList.remove('ping');
+        void tile.offsetWidth;
+        tile.classList.add('ping');
+      }
+
+      /* ---- task drawer ---- */
+      function toggleDrawer(id) {
+        openTask = id;
+        renderBar();
+        $('#drawer').classList.toggle('on', !!id);
+        $('#scrim').classList.toggle('on', !!id);
+        if (id) renderDrawer();
+      }
+      $('#scrim').addEventListener('click', () => toggleDrawer(null));
+      function renderDrawer() {
+        const t = M.taskById[openTask];
+        if (!t) return;
+        const i = M.tasks.indexOf(t);
+        $('#drawer').innerHTML = `
+          <div class="drawer-head"><span class="eyebrow">Task ${i + 1} of ${M.tasks.length} · ${M.taskStatus(t.id)}</span><button class="x" id="dr-close" aria-label="Close">✕</button></div>
+          <h2>${esc(t.name)}</h2>
+          <p class="quote">${esc(t.description)}</p>
+          <dl class="facts"><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Success</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd class="num">${t.maxSteps}</dd></dl>
+          <div><span class="eyebrow">Per persona</span>
+          <ul style="margin-top:6px">${M.agents
+            .map((a) => {
+              const p = M.personaOf(a);
+              const o = a.outcomes[t.id];
+              const st = o || (a.currentTaskId === t.id ? 'active' : 'pending');
+              const n = M.historyOf(a.id, t.id).length;
+              return `<li><button class="orow" data-agent="${a.id}" ${st === 'pending' ? 'disabled' : ''}>${avatar(a, p)}<span>${esc(p.name)}</span><span class="steps-n num">${n ? n + ' steps' : '—'}</span><span class="state-tag ${st}">${st}</span></button></li>`;
+            })
+            .join('')}</ul></div>`;
+        $('#dr-close').addEventListener('click', () => toggleDrawer(null));
+        $('#drawer').querySelectorAll('[data-agent]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const src = $(`.tile[data-agent="${b.dataset.agent}"] .pumpwrap`);
+            toggleDrawer(null);
+            openAgent(b.dataset.agent, t.id, src);
+          }),
+        );
+      }
+
+      function openAgent(agentId, taskId, src) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId }, src);
+        if (state() === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId)) return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId }, src);
+        const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+        openSandbox({ kind: 'replay', agentId, taskId: target }, src);
+      }
+
+      /* ---- sandbox ---- */
+      function openSandbox(mode, src) {
+        const wasOpen = !!sb;
+        sb = mode;
+        after = false;
+        clearInterval(replay.timer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#sandbox').hidden = false;
+        $('#sandbox').classList.toggle('enter', !wasOpen);
+        document.body.classList.add('zooming');
+        renderSandbox();
+        if (mode.kind === 'replay') startReplay();
+        flipFrom(wasOpen ? null : src);
+      }
+      // FLIP: start the hero pump at the tile's rect, then release it to its own.
+      function flipFrom(src) {
+        const flip = $('#flip');
+        flip.style.transition = 'none';
+        flip.style.transform = '';
+        if (!src || reduced) return;
+        const from = src.getBoundingClientRect();
+        const to = flip.getBoundingClientRect();
+        if (!to.width || !from.width) return;
+        flip.style.transform = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})`;
+        void flip.offsetWidth;
+        flip.style.transition = 'transform 0.55s cubic-bezier(0.22, 1, 0.36, 1)';
+        flip.style.transform = '';
+      }
+      function closeSandbox() {
+        clearInterval(replay.timer);
+        sb = null;
+        $('#sandbox').hidden = true;
+        document.body.classList.remove('zooming');
+        renderWall();
+      }
+      $('#sb-back').addEventListener('click', closeSandbox);
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (openTask) toggleDrawer(null);
+        else if (sb) closeSandbox();
+      });
+
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((a) => a === 'press select')) return 'basal';
+        if (seen.some((a) => a.startsWith('hold up') || a === 'press up')) return 'bolus';
+        if (seen.some((a) => a === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderSandbox() {
+        const left = $('#sb-left');
+        const right = $('#sb-right');
+        const steps = stepsFor();
+        const kind = $('#sb-kind');
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#sb-body').classList.toggle('change', sb.kind === 'change');
+        $('#vp').className = 'vp';
+
+        if (sb.kind === 'change') {
+          const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+          $('#sb-title').textContent = 'Proposed changes';
+          kind.className = 'kind';
+          kind.textContent = `${M.suggestions.length} suggestions`;
+          $('#stage').dataset.screen = '';
+          $('#stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+          injectFx();
+          left.innerHTML = right.innerHTML = '';
+          // The selected card expands, so it always takes the top-left slot; the rest fill the others.
+          const slots = ['left:0;top:72%', 'right:0;top:4%', 'right:0;top:36%', 'right:0;top:68%'];
+          let slot = 0;
+          $('#orbit').innerHTML = M.suggestions
+            .map((x, i) => {
+              const on = x.id === s.id;
+              const pos = on ? 'left:0;top:2%' : slots[slot++];
+              const params = JSON.stringify(x.change.params).replace(/[{}"]/g, '').replace(/,/g, ', ').replace(/:/g, ': ');
+              const ev = x.evidence
+                .map((e) => {
+                  const ea = M.agentById[e.agentId];
+                  return `<button class="ev" data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}">${avatar(ea, M.personaOf(ea))}<span>${esc(M.personaOf(ea).name)}<br /><small>${esc(M.taskById[e.taskId].short)}</small></span><span class="mono">§${e.step}</span></button>`;
+                })
+                .join('');
+              return `<div class="ocard glass ${on ? 'on' : ''}" style="${pos};animation-delay:${0.05 * i}s">
+                <button class="pick" data-sug="${x.id}" aria-pressed="${on}"><span class="tag ${x.category}">${x.category}</span><span class="idx num">${i + 1}/${M.suggestions.length}</span><h3>${esc(x.title)}</h3></button>
+                <div class="more"><p>${esc(x.rationale)}</p><div class="ctype mono">${esc(x.change.type)}(${esc(params)})</div><span class="eyebrow">Evidence</span>${ev}</div></div>`;
+            })
+            .join('');
+          $('#orbit').querySelectorAll('[data-sug]').forEach((b) =>
+            b.addEventListener('click', () => {
+              sb.suggestionId = b.dataset.sug;
+              after = false;
+              renderSandbox();
+            }),
+          );
+          $('#orbit').querySelectorAll('[data-ev-agent]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evAgent, taskId: b.dataset.evTask })));
+          setBA(s);
+          // Reveal "after" shortly after opening, as the real view does.
+          setTimeout(() => {
+            if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) {
+              after = true;
+              setBA(s);
+            }
+          }, 900);
+          return;
+        }
+
+        $('#orbit').innerHTML = '';
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const outcome = a.outcomes[sb.taskId];
+        $('#sb-title').textContent = t ? t.name : '';
+        kind.className = 'kind ' + sb.kind;
+        kind.textContent = sb.kind === 'live' ? 'Live' : 'Replay';
+        $('#stage').dataset.screen = '';
+
+        left.innerHTML = `
+          <div class="card glass"><div class="who">${avatar(a, p)}<div><h3>${esc(p.name)}</h3><div class="sub num">${p.age} · ${esc(p.gender)}</div></div><span class="pill"><i></i>${esc(a.status)}</span></div>
+            <div class="chips" id="chips">${p.modifiers.length ? p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('') : '<span class="chip none">no modifiers</span>'}</div></div>
+          <div class="card glass" id="step-card"></div>
+          ${outcome === 'failed' || outcome === 'errored' ? `<div class="card glass failure ${outcome}"><span class="eyebrow">${outcome === 'errored' ? 'Errored' : 'Failed'}</span><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>` : ''}`;
+        renderStep();
+
+        right.innerHTML = `<div class="card glass"><span class="eyebrow">Tasks · <span class="num">${Object.keys(a.outcomes).length}/${M.tasks.length}</span> scored</span><ul>${M.tasks
+          .map((x) => {
+            const o = a.outcomes[x.id];
+            const live = a.currentTaskId === x.id && !o;
+            const n = M.historyOf(a.id, x.id).length;
+            return `<li><button class="trow ${x.id === sb.taskId ? 'on' : ''}" data-task="${x.id}" data-live="${live ? 1 : 0}" ${n ? '' : 'disabled'}>${g(o || (live ? 'active' : 'pending'))}<span class="t">${esc(x.short)}</span><span class="n num">${n || ''}</span></button></li>`;
+          })
+          .join('')}</ul></div>`;
+        right.querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.task })),
+        );
+
+        if (sb.kind === 'replay') {
+          $('#scrub').max = steps.length;
+          $('#steps').innerHTML = steps.map((s, i) => `<li><button data-i="${i}"><sup>${i + 1}</sup>${esc(s.action)}</button></li>`).join('');
+          $('#steps').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+          renderTransport();
+        }
+      }
+
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const scr = screenFor(shown, steps, t);
+        $('#step-card').innerHTML = `
+          <span class="eyebrow num">${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${esc(t ? t.short : '')}</span>
+          <div class="action">${cur ? esc(cur.action) : 'waiting to start'}</div>
+          ${cur && cur.reasoning ? `<q class="reasoning">${esc(cur.reasoning)}</q>` : ''}
+          ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: scr })}<figcaption>heard confirmation beep (4 kHz, 80 ms)</figcaption></figure>` : ''}`;
+        const stage = $('#stage');
+        const key = pressedOf(cur);
+        if (stage.dataset.screen !== scr) {
+          stage.dataset.screen = scr;
+          stage.innerHTML = M.pumpSvg({ screen: scr, pressed: key });
+        }
+        stage.querySelectorAll('.key').forEach((k) => k.classList.toggle('pressed', k.dataset.button === key));
+        // Modifier chips flash as each step lands: the persona's filters act on every frame.
+        document.querySelectorAll('#chips .chip:not(.none)').forEach((c) => {
+          c.classList.add('hot');
+          setTimeout(() => c.classList.remove('hot'), 500);
+        });
+      }
+
+      /* replay transport */
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing) return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            renderTransport();
+            return;
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const playing = replay.playing && replay.cursor < n;
+        $('#scrub').value = replay.cursor;
+        $('#pos').textContent = `${replay.cursor} / ${n}`;
+        $('#play-icon').setAttribute('d', playing ? 'M5 3.5v9M11 3.5v9' : 'M5 3.5v9l7-4.5z');
+        $('#play-icon').setAttribute('fill', playing ? 'none' : 'currentColor');
+        $('#steps')
+          .querySelectorAll('button')
+          .forEach((b, i) => {
+            b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+            if (i === replay.cursor) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: reduced ? 'auto' : 'smooth' });
+          });
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      });
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      /* change mode fx */
+      function injectFx() {
+        $('#stage svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#38bdf8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#fbbf24" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#38bdf8"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#04111d" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#fbbf24" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+      function setBA(s) {
+        $('#ba').querySelectorAll('[data-after]').forEach((b) => b.classList.toggle('on', (b.dataset.after === '1') === after));
+        $('#vp').className = 'vp' + (after ? ' after-' + s.change.type : '');
+      }
+      $('#ba').querySelectorAll('[data-after]').forEach((b) =>
+        b.addEventListener('click', () => {
+          if (!sb || sb.kind !== 'change') return;
+          after = b.dataset.after === '1';
+          setBA(M.suggestions.find((x) => x.id === sb.suggestionId));
+        }),
+      );
+
+      /* cosmetic orbit + zoom */
+      (function orbit() {
+        const vp = $('#vp');
+        const stage = $('#stage');
+        let drag = null;
+        let rx = -4;
+        let ry = 16;
+        let z = 1;
+        const apply = () => (stage.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => {
+          if (e.target.closest('button')) return;
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          stage.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          drag = null;
+          vp.classList.remove('dragging');
+          stage.style.transition = '';
+        });
+        vp.addEventListener(
+          'wheel',
+          (e) => {
+            e.preventDefault();
+            z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+            apply();
+          },
+          { passive: false },
+        );
+      })();
+
+      /* mock controls */
+      function renderAll() {
+        renderBar();
+        if (!sb) renderWall();
+        if (openTask) renderDrawer();
+      }
+      document.addEventListener('mock:state', renderAll);
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (openTask) toggleDrawer(null);
+        if (k === 'dashboard') return closeSandbox();
+        if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+        openSandbox({ kind: k, ...M.defaults[k] }, $(`.tile[data-agent="${M.defaults[k].agentId}"] .pumpwrap`));
+      });
+
+      renderAll();
+      M.mountControls();
+    </script>
+  </body>
+</html>

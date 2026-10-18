@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clinical · Infallible design 06</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      /* 06 · Clinical — medical-device UI: labelled fields, white panels, IEC 60601 alert priorities. */
+      :root {
+        --canvas: #eef2f6;
+        --panel: #ffffff;
+        --sunk: #f6f8fb;
+        --line: #cbd5e1;
+        --line-2: #94a3b8;
+        --ink: #0f1d2e;
+        --ink-2: #44546a;
+        --ink-3: #6b7a90;
+        --high: #d32f2f;
+        --med: #f9a825;
+        --low: #1976d2;
+        --ok: #2e7d32;
+        --high-bg: #fdecec;
+        --med-bg: #fff6dc;
+        --low-bg: #e8f1fb;
+        --ok-bg: #e8f3e9;
+        --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+        --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+        --r: 4px;
+        --ease: cubic-bezier(0.3, 0.7, 0.2, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font: 15px/1.5 var(--sans);
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+      ul, ol { padding: 0; list-style: none; }
+      button {
+        font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+      }
+      button:disabled { cursor: not-allowed; opacity: 0.5; }
+      :focus-visible { outline: 3px solid var(--low); outline-offset: 2px; }
+      code, .mono { font-family: var(--mono); font-size: 0.88em; }
+      .num { font-variant-numeric: tabular-nums; }
+      .muted { color: var(--ink-2); }
+      .flabel {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 3px;
+      }
+      .fval { font-size: 16px; font-weight: 500; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .ph {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+      .ph h2 { font-size: 16px; font-weight: 600; }
+      .ph .count { margin-left: auto; font-size: 14px; color: var(--ink-2); }
+      .pb { padding: 16px 18px; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+      /* badges */
+      .badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+        padding: 2px 8px; border-radius: 3px; border: 1px solid; white-space: nowrap;
+      }
+      .badge.done, .badge.passed { color: var(--ok); background: var(--ok-bg); border-color: #a5d6a7; }
+      .badge.failed { color: var(--high); background: var(--high-bg); border-color: #ef9a9a; }
+      .badge.errored { color: #8a5a00; background: var(--med-bg); border-color: #f3cf6b; }
+      .badge.active { color: var(--low); background: var(--low-bg); border-color: #90caf9; }
+      .badge.pending { color: var(--ink-3); background: var(--sunk); border-color: var(--line); }
+      .badge.active::before {
+        content: ''; width: 9px; height: 9px; border-radius: 50%;
+        border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.9s linear infinite;
+      }
+      body[data-state='completed'] .badge.active::before { animation: none; border-right-color: currentColor; }
+      .led { width: 12px; height: 12px; border-radius: 50%; display: inline-block; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+      .led.working { background: var(--low); animation: blink 1.4s steps(2) infinite; }
+      .led.ok { background: var(--ok); }
+      .led.bad { background: var(--high); }
+      body[data-state='completed'] .led.working { animation: none; background: var(--ok); }
+
+      /* ---- app layout ---- */
+      main#dashboard {
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto 1fr 210px;
+        gap: 14px;
+        padding: 14px 18px 18px;
+      }
+      .band {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-top: 4px solid var(--low);
+        border-radius: var(--r);
+        display: flex;
+        align-items: stretch;
+      }
+      body[data-state='evaluating'] .band { border-top-color: var(--med); }
+      body[data-state='completed'] .band { border-top-color: var(--ok); }
+      .brand { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-right: 1px solid var(--line); }
+      .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+      .brand small { display: block; font-size: 12px; color: var(--ink-3); font-weight: 500; }
+      .field { padding: 12px 22px; border-right: 1px solid var(--line); min-width: 0; }
+      .field:last-child { border-right: 0; }
+      .state-val { display: inline-flex; align-items: center; gap: 8px; text-transform: capitalize; }
+      .state-val .led { background: var(--low); }
+      body[data-state='running'] .state-val .led { animation: blink 1.4s steps(2) infinite; }
+      body[data-state='evaluating'] .state-val .led { background: var(--med); }
+      body[data-state='completed'] .state-val .led { background: var(--ok); }
+      .band .spacer { flex: 1; }
+
+      .body2 { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); gap: 14px; min-height: 0; }
+      .protocol { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 0; flex: 1; }
+      .tlist { border-right: 1px solid var(--line); overflow-y: auto; padding: 8px 0; }
+      .titem {
+        width: 100%; display: grid; grid-template-columns: 28px 1fr; gap: 4px 10px;
+        padding: 10px 16px; border-left: 4px solid transparent; transition: background .15s;
+      }
+      .titem:hover { background: var(--sunk); }
+      .titem.on { background: var(--low-bg); border-left-color: var(--low); }
+      .titem .n {
+        grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+        border: 1px solid var(--line-2); font-size: 13px; font-weight: 600; color: var(--ink-2);
+      }
+      .titem.on .n { background: var(--low); border-color: var(--low); color: #fff; }
+      .titem .t { font-weight: 500; line-height: 1.3; }
+      .titem .badge { justify-self: start; }
+      .only-evaluating, .only-completed { display: none !important; }
+      body[data-state='evaluating'] .only-evaluating, body[data-state='completed'] .only-completed { display: grid !important; }
+      .evalrow { margin: 8px 12px; padding: 10px 12px; border: 1px solid #f3cf6b; background: var(--med-bg); border-radius: var(--r); grid-template-columns: auto 1fr; gap: 10px; align-items: center; font-weight: 600; color: #6d4c00; }
+      .evalrow i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--med); border-right-color: transparent; animation: spin .9s linear infinite; }
+      .sugrow { margin: 8px 12px; padding: 10px 14px; border-radius: var(--r); background: var(--ok); color: #fff; font-weight: 600; grid-template-columns: 1fr auto; align-items: center; width: calc(100% - 24px); }
+      .sugrow:hover { background: #256628; }
+
+      .tdetail { overflow-y: auto; padding: 18px 20px; min-width: 0; }
+      .tdetail .empty { color: var(--ink-3); padding: 30px 0; text-align: center; }
+      .form { display: grid; gap: 14px; animation: rise .3s var(--ease) both; }
+      .form h3 { font-size: 19px; font-weight: 600; line-height: 1.25; }
+      .box { border: 1px solid var(--line); border-radius: var(--r); padding: 9px 12px; background: var(--sunk); font-size: 15px; }
+      .box.quote { border-left: 4px solid var(--line-2); font-style: italic; color: var(--ink-2); }
+      .box.code { font-family: var(--mono); font-size: 13.5px; background: #f1f5f9; }
+      .row2 { display: grid; grid-template-columns: 1fr 120px; gap: 14px; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--sunk); position: sticky; top: 0; z-index: 1; }
+      td { padding: 9px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+      tr.click { cursor: pointer; transition: background .12s; }
+      tr.click:hover td { background: var(--low-bg); }
+      tr.dis td { color: var(--ink-3); }
+      .open-btn { font-size: 13px; font-weight: 600; color: var(--low); padding: 3px 10px; border: 1px solid #90caf9; border-radius: 3px; background: #fff; }
+      .open-btn:hover:not(:disabled) { background: var(--low); color: #fff; }
+      .avatar {
+        width: 34px; height: 34px; border-radius: var(--r); display: grid; place-items: center;
+        background: var(--low-bg); color: var(--low); font-weight: 700; font-size: 15px; border: 1px solid #90caf9;
+      }
+      .ptable td.ct { font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+      .spin { display: inline-block; width: 11px; height: 11px; margin-right: 6px; border-radius: 50%; border: 2px solid var(--low); border-right-color: transparent; animation: spin .9s linear infinite; vertical-align: -1px; }
+      body[data-state='completed'] .spin { display: none; }
+      .pass { color: var(--ok); font-weight: 600; }
+      .fail { color: var(--high); font-weight: 600; }
+
+      /* audit trail */
+      .audit .pb { padding: 0; }
+      .log { font-family: var(--mono); font-size: 13.5px; }
+      .log li { display: grid; grid-template-columns: 80px 200px 170px 1fr; gap: 12px; padding: 5px 18px; border-bottom: 1px solid #edf1f5; }
+      .log li:first-child { background: var(--low-bg); }
+      .log .ts { color: var(--ink-3); }
+      .log .who { color: var(--ink); font-family: var(--sans); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .log .tk { color: var(--ink-2); font-family: var(--sans); font-size: 13px; }
+      .log li.new { animation: flash 1.2s var(--ease); }
+
+      /* ---- sandbox ---- */
+      #sandbox {
+        position: fixed; inset: 0; background: var(--canvas); z-index: 5;
+        display: grid; grid-template-rows: auto 1fr; gap: 14px; padding: 14px 18px 18px;
+        animation: fadein .25s var(--ease) both;
+      }
+      #sandbox[hidden] { display: none; }
+      .sbhead { display: flex; align-items: center; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+      .back { display: inline-flex; align-items: center; gap: 8px; padding: 0 20px; align-self: stretch; font-weight: 600; color: var(--low); border-right: 1px solid var(--line); }
+      .back:hover { background: var(--low-bg); }
+      .back kbd { font-family: var(--mono); font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; }
+      .mode-tag { margin-left: auto; margin-right: 18px; }
+      .sbgrid { display: grid; grid-template-columns: 300px minmax(0, 1fr) 360px; gap: 14px; min-height: 0; }
+      .col { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+      .col > .panel { flex-shrink: 0; }
+      .card { padding: 14px 16px; display: grid; gap: 12px; animation: rise .3s var(--ease) both; }
+      .who { display: flex; align-items: center; gap: 12px; }
+      .who h3 { font-size: 17px; font-weight: 600; line-height: 1.2; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .chip { font-size: 13px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--sunk); }
+      .bigaction { font-size: 24px; font-weight: 600; line-height: 1.2; animation: rise .3s var(--ease) both; }
+      .frame { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+      .frame svg { display: block; width: 100%; }
+      .frame figcaption { font-size: 13px; padding: 6px 10px; background: var(--sunk); border-top: 1px solid var(--line); color: var(--ink-2); }
+      .alert {
+        display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 14px 16px;
+        border: 1px solid #ef9a9a; border-left: 6px solid var(--high); background: var(--high-bg); border-radius: var(--r);
+        animation: rise .3s var(--ease) both;
+      }
+      .alert.med { border-color: #f3cf6b; border-left-color: var(--med); background: var(--med-bg); }
+      .alert h4 { margin: 0 0 4px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--high); }
+      .alert.med h4 { color: #8a5a00; }
+      .alert p { font-size: 14.5px; }
+      .atlist button { width: 100%; display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 16px; border-left: 4px solid transparent; border-bottom: 1px solid #edf1f5; }
+      .atlist button:hover:not(:disabled) { background: var(--sunk); }
+      .atlist button.on { border-left-color: var(--low); background: var(--low-bg); font-weight: 600; }
+      .atlist .n { font-size: 13px; color: var(--ink-3); }
+
+      .obs { flex: 1; }
+      .capbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+      .capbar > div { padding: 8px 14px; border-right: 1px solid var(--line); min-width: 0; }
+      .capbar > div:last-child { border-right: 0; }
+      .capbar .fval { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+      .viewport {
+        position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: grab; user-select: none;
+        display: grid; place-items: center;
+        background:
+          radial-gradient(ellipse 60% 50% at 50% 45%, rgba(255,255,255,.9), transparent 70%),
+          linear-gradient(transparent 0 0),
+          #e4eaf1;
+      }
+      .viewport::before {
+        content: ''; position: absolute; left: -20%; right: -20%; bottom: -10%; height: 60%;
+        background:
+          repeating-linear-gradient(0deg, transparent 0 39px, rgba(25,118,210,.13) 39px 40px),
+          repeating-linear-gradient(90deg, transparent 0 39px, rgba(25,118,210,.13) 39px 40px);
+        transform: perspective(500px) rotateX(62deg); transform-origin: bottom;
+        mask-image: linear-gradient(transparent, #000 70%);
+        -webkit-mask-image: linear-gradient(transparent, #000 70%);
+      }
+      .viewport::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px rgba(15,29,46,.18); }
+      .viewport.dragging { cursor: grabbing; }
+      .shadow { position: absolute; bottom: 9%; width: 34%; height: 26px; border-radius: 50%; background: radial-gradient(closest-side, rgba(15,29,46,.32), transparent); }
+      .stage { position: relative; z-index: 1; height: 72%; aspect-ratio: 180/320; transform-style: preserve-3d; transition: transform .5s var(--ease); filter: drop-shadow(0 18px 18px rgba(15,29,46,.3)); }
+      .stage svg { width: 100%; height: 100%; display: block; }
+      .stage .key, .stage .screen text, .stage .fx { transition: transform .7s var(--ease), opacity .5s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .stage .fx { opacity: 0; }
+      .stage .key.pressed rect { fill: var(--low); }
+      .viewport.after-move_button .key-select { transform: translateY(16px); }
+      .viewport.after-resize_text .screen text { transform: scale(1.5); }
+      .viewport.after-confirm_dialog .fx-dialog, .viewport.after-change_timeout .fx-timeout, .viewport.after-add_audio_cue .fx-audio { opacity: 1; }
+      .vhint { position: absolute; left: 12px; bottom: 10px; z-index: 2; font-size: 12px; color: var(--ink-3); background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 3px; border: 1px solid var(--line); }
+      .vmode { position: absolute; right: 12px; top: 10px; z-index: 2; }
+
+      .transport { border-top: 1px solid var(--line); padding: 10px 14px 12px; display: grid; gap: 10px; }
+      .transport[hidden] { display: none; }
+      .stepper { display: flex; align-items: center; gap: 8px; }
+      .tbtn { height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+      .tbtn:hover { border-color: var(--low); color: var(--low); }
+      .tbtn.primary { background: var(--low); border-color: var(--low); color: #fff; min-width: 96px; justify-content: center; }
+      .tbtn.primary:hover { background: #135ea8; color: #fff; }
+      .stepof { margin-left: 8px; font-weight: 600; }
+      .stepper input { flex: 1; accent-color: var(--low); cursor: pointer; margin-left: 10px; }
+      .steps { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+      .steps button { flex-shrink: 0; font-size: 13px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap; color: var(--ink-2); background: #fff; }
+      .steps button b { font-family: var(--mono); font-weight: 500; margin-right: 5px; color: var(--ink-3); }
+      .steps button.done { background: #e2e8f0; color: var(--ink); }
+      .steps button.next { border-color: var(--low); color: var(--low); box-shadow: inset 0 0 0 1px var(--low); }
+      .steps button:hover { border-color: var(--ink-2); }
+
+      .transcript { flex: 1; }
+      .tx li { display: grid; grid-template-columns: 70px 1fr; gap: 2px 12px; padding: 10px 16px; border-bottom: 1px solid #edf1f5; border-left: 4px solid transparent; transition: background .2s, opacity .2s; }
+      .tx li.fut { opacity: .45; }
+      .tx li.cur { background: var(--low-bg); border-left-color: var(--low); }
+      .tx .ts { font-family: var(--mono); font-size: 13px; color: var(--ink-3); grid-row: span 2; padding-top: 2px; }
+      .tx .ac { font-weight: 600; font-family: var(--mono); font-size: 14px; }
+      .tx .rs { font-size: 14px; color: var(--ink-2); }
+
+      /* change request */
+      .cr { padding: 16px; display: grid; gap: 14px; animation: rise .3s var(--ease) both; }
+      .cat { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 3px; color: #fff; display: inline-block; }
+      .cat.hardware { background: #6a1b9a; }
+      .cat.firmware { background: var(--low); }
+      .cat.interaction { background: var(--ok); }
+      .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; }
+      .seg button { padding: 7px 22px; font-weight: 600; font-size: 14px; background: #fff; transition: background .2s; }
+      .seg button + button { border-left: 1px solid var(--line-2); }
+      .seg button.on { background: var(--ink); color: #fff; }
+      .evrow { width: 100%; display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; margin-bottom: 6px; }
+      .evrow:hover { border-color: var(--low); background: var(--low-bg); }
+      .evrow .st { font-family: var(--mono); color: var(--ink-3); }
+      .sglist button { width: 100%; display: grid; grid-template-columns: 26px 1fr; gap: 4px 10px; padding: 12px 16px; border-bottom: 1px solid #edf1f5; border-left: 4px solid transparent; }
+      .sglist button:hover { background: var(--sunk); }
+      .sglist button.on { background: var(--low-bg); border-left-color: var(--low); }
+      .sglist .n { grid-row: span 2; font-weight: 600; color: var(--ink-3); }
+      .sglist .t { font-weight: 500; line-height: 1.3; }
+
+      @media (max-width: 1280px) {
+        .sbgrid { grid-template-columns: 270px minmax(0, 1fr) 300px; }
+        .protocol { grid-template-columns: 210px minmax(0, 1fr); }
+        .log li { grid-template-columns: 80px 170px 140px 1fr; }
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes blink { 50% { opacity: .35; } }
+      @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes flash { from { background: #fff3c4; } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <main id="dashboard">
+      <header class="band">
+        <div class="brand">
+          <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="4" fill="#1976d2"/><path d="M14 7v14M7 14h14" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/></svg>
+          <div><h1>Infallible</h1><small>Usability test console</small></div>
+        </div>
+        <div class="field"><span class="flabel">Run ID</span><span class="fval mono" id="run-id"></span></div>
+        <div class="field"><span class="flabel">State</span><span class="fval state-val"><i class="led"></i><span id="run-state"></span></span></div>
+        <div class="field"><span class="flabel">Started</span><span class="fval num" id="run-started"></span></div>
+        <div class="field"><span class="flabel">Personas</span><span class="fval num" id="n-agents"></span></div>
+        <div class="field"><span class="flabel">Tasks</span><span class="fval num" id="n-tasks"></span></div>
+        <div class="spacer"></div>
+      </header>
+
+      <div class="body2">
+        <section class="panel">
+          <div class="ph"><h2>Task protocol</h2><span class="count num" id="tasks-count"></span></div>
+          <div class="protocol">
+            <ol class="tlist" id="task-rows"></ol>
+            <div class="tdetail" id="detail"></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="ph"><h2>Participants</h2><span class="count num" id="personas-count"></span></div>
+          <div class="pb" style="padding:0">
+            <table class="ptable">
+              <thead><tr><th style="width:52px"></th><th>Persona</th><th>Age</th><th>Current task</th><th>Passed</th><th>Failed</th><th>Status</th></tr></thead>
+              <tbody id="persona-rows"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel audit">
+        <div class="ph"><h2>Audit trail</h2><span class="count num" id="audit-count"></span></div>
+        <div class="pb"><ol class="log" id="log"></ol></div>
+      </section>
+    </main>
+
+    <section id="sandbox" hidden>
+      <header class="sbhead">
+        <button class="back" id="sb-back">&larr; Back <kbd>Esc</kbd></button>
+        <div class="field"><span class="flabel" id="sb-kind-label">Mode</span><span class="fval" id="sb-title"></span></div>
+        <span class="mode-tag" id="sb-kind"></span>
+      </header>
+      <div class="sbgrid">
+        <div class="col" id="sb-left"></div>
+        <section class="panel obs">
+          <div class="ph"><h2>Observation</h2><span class="count" id="obs-sub"></span></div>
+          <div class="capbar" id="capbar"></div>
+          <div class="viewport" id="viewport">
+            <div class="shadow"></div>
+            <div class="stage" id="stage"></div>
+            <span class="vhint">Drag to orbit · scroll to zoom</span>
+          </div>
+          <footer class="transport" id="transport" hidden>
+            <div class="stepper">
+              <button class="tbtn" id="prev">&lsaquo; Prev</button>
+              <button class="tbtn primary" id="play">Pause</button>
+              <button class="tbtn" id="next">Next &rsaquo;</button>
+              <span class="stepof num" id="stepof"></span>
+              <input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub steps" />
+            </div>
+            <ol class="steps" id="steps"></ol>
+          </footer>
+        </section>
+        <div class="col" id="sb-right"></div>
+      </div>
+    </section>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const badge = (st) => `<span class="badge ${st}">${st}</span>`;
+      const icon = {
+        high: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22z" fill="#d32f2f"/><path d="M12 9v5" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.4" fill="#fff"/></svg>',
+        med: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22z" fill="#f9a825"/><path d="M12 9v5" stroke="#3a2a00" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="17.5" r="1.4" fill="#3a2a00"/></svg>',
+      };
+
+      let selectedTask = M.tasks[0].id;
+      let sb = null;
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+
+      /* ---- dashboard ---- */
+      function renderDashboard() {
+        const state = document.body.dataset.state;
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-started').textContent = M.run.startedAt;
+        $('#run-state').textContent = state;
+        $('#n-agents').textContent = M.agents.length;
+        $('#n-tasks').textContent = M.tasks.length;
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#tasks-count').textContent = `${done} of ${M.tasks.length} done`;
+        $('#personas-count').textContent = `${M.agents.length} enrolled`;
+
+        $('#task-rows').innerHTML =
+          M.tasks
+            .map((t, i) => {
+              const st = M.taskStatus(t.id);
+              return `<li><button class="titem ${t.id === selectedTask ? 'on' : ''}" data-task="${t.id}" aria-pressed="${t.id === selectedTask}"><span class="n num">${i + 1}</span><span class="t">${esc(t.short)}</span>${badge(st)}</button></li>`;
+            })
+            .join('') +
+          `<li class="evalrow only-evaluating"><i></i><span>Evaluating outcomes…</span></li>` +
+          `<li><button class="sugrow only-completed" data-open-change><span>See suggestions (${M.suggestions.length})</span><span>&rarr;</span></button></li>`;
+        $('#task-rows').querySelectorAll('[data-task]').forEach((b) => b.addEventListener('click', () => { selectedTask = b.dataset.task; renderDashboard(); }));
+        $('[data-open-change]').addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+
+        $('#persona-rows').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const task = M.taskById[a.currentTaskId];
+            const completed = state === 'completed';
+            const cur = completed ? 'done' : a.status === 'error' ? 'error' : `<i class="spin"></i>${esc(task ? task.short : a.status)}`;
+            const fails = a.failed + a.errored;
+            const led = completed ? (fails ? 'bad' : 'ok') : a.status === 'error' ? 'bad' : 'working';
+            return `<tr class="click" data-agent="${a.id}" tabindex="0"><td><span class="avatar">${esc(p.name[0])}</span></td><td><b style="font-weight:600">${esc(p.name)}</b></td><td class="num">${p.age}</td><td class="ct">${cur}</td><td class="num pass">${a.passed}</td><td class="num fail">${fails}</td><td><span class="led ${led}" title="${esc(a.status)}"></span></td></tr>`;
+          })
+          .join('');
+        $('#persona-rows').querySelectorAll('[data-agent]').forEach((r) => {
+          r.addEventListener('click', () => openAgent(r.dataset.agent, null));
+          r.addEventListener('keydown', (e) => e.key === 'Enter' && openAgent(r.dataset.agent, null));
+        });
+        renderDetail();
+        renderAudit();
+      }
+
+      function renderDetail() {
+        const t = M.taskById[selectedTask];
+        if (!t) return ($('#detail').innerHTML = '<p class="empty">Select a task to view its protocol.</p>');
+        const i = M.tasks.indexOf(t);
+        const rows = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const o = a.outcomes[t.id];
+            const live = a.currentTaskId === t.id && !o;
+            const st = o || (live ? 'active' : 'pending');
+            const n = M.historyOf(a.id, t.id).length;
+            const dis = st === 'pending';
+            return `<tr class="${dis ? 'dis' : 'click'}" data-agent="${a.id}"><td>${esc(p.name)}</td><td>${badge(st)}</td><td class="num">${n || '—'}</td><td><button class="open-btn" data-agent="${a.id}" ${dis ? 'disabled' : ''}>${live ? 'Live' : 'Open'}</button></td></tr>`;
+          })
+          .join('');
+        $('#detail').innerHTML = `
+          <div class="form" >
+            <div><span class="flabel">Task ${i + 1} of ${M.tasks.length}</span><h3>${esc(t.name)}</h3></div>
+            <div><span class="flabel">Description</span><div class="box quote">“${esc(t.description)}”</div></div>
+            <div><span class="flabel">Goal</span><div class="box">${esc(t.goal)}</div></div>
+            <div class="row2">
+              <div><span class="flabel">Success criterion</span><div class="box code">${esc(t.success)}</div></div>
+              <div><span class="flabel">Max steps</span><div class="box num fval">${t.maxSteps}</div></div>
+            </div>
+            <div><span class="flabel">Outcomes by persona</span>
+              <table><thead><tr><th>Persona</th><th>Outcome</th><th>Steps</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+            </div>
+          </div>`;
+        $('#detail').querySelectorAll('tr.click').forEach((r) => r.addEventListener('click', () => openAgent(r.dataset.agent, t.id)));
+      }
+
+      function renderAudit() {
+        const ev = [];
+        for (const a of M.agents)
+          for (const t of M.tasks)
+            for (const s of M.historyOf(a.id, t.id)) ev.push({ at: s.at, who: M.personaOf(a).name, task: t.short, action: s.action });
+        ev.sort((x, y) => (x.at < y.at ? 1 : -1));
+        $('#audit-count').textContent = `${ev.length} events`;
+        $('#log').innerHTML = ev
+          .map((e, i) => `<li class="${i === 0 ? 'new' : ''}"><span class="ts num">${e.at}</span><span class="who">${esc(e.who)}</span><span class="tk">${esc(e.task)}</span><span>${esc(e.action)}</span></li>`)
+          .join('');
+      }
+
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (document.body.dataset.state === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId))
+          return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        openSandbox({ kind: 'replay', agentId, taskId: taskId || Object.keys(a.outcomes).pop() || a.currentTaskId });
+      }
+
+      /* ---- sandbox ---- */
+      function openSandbox(mode) {
+        sb = mode;
+        after = false;
+        clearInterval(replay.timer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#sandbox').hidden = false;
+        $('#dashboard').style.visibility = 'hidden';
+        renderSandbox();
+        if (mode.kind === 'replay') startReplay();
+      }
+      function closeSandbox() {
+        clearInterval(replay.timer);
+        sb = null;
+        $('#sandbox').hidden = true;
+        $('#dashboard').style.visibility = '';
+      }
+      $('#sb-back').addEventListener('click', closeSandbox);
+      window.addEventListener('keydown', (e) => e.key === 'Escape' && sb && closeSandbox());
+
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+      const shownStep = () => (sb.kind === 'live' ? stepsFor().length : replay.cursor);
+
+      function renderSandbox() {
+        const left = $('#sb-left');
+        const right = $('#sb-right');
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#viewport').className = 'viewport';
+        $('#stage').dataset.screen = '';
+
+        if (sb.kind === 'change') {
+          const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+          const idx = M.suggestions.indexOf(s);
+          $('#sb-kind-label').textContent = 'Change request';
+          $('#sb-title').textContent = `CR-${String(idx + 1).padStart(3, '0')} · ${s.title}`;
+          $('#sb-kind').innerHTML = `<span class="badge done">Proposed</span>`;
+          $('#obs-sub').textContent = 'Before / after preview';
+          $('#capbar').innerHTML = cap('Change type', `<span class="mono">${s.change.type}</span>`) + cap('Category', esc(s.category)) + cap('Evidence', `${s.evidence.length} steps`) + cap('Showing', `<span id="cap-ba">${after ? 'After' : 'Before'}</span>`);
+          $('#stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+          injectFx();
+          const params = Object.entries(s.change.params).map(([k, v]) => `${k}: ${v}`).join(', ');
+          left.innerHTML = `
+            <section class="panel"><div class="ph"><h2>Change request</h2><span class="count mono">CR-${String(idx + 1).padStart(3, '0')}</span></div>
+              <div class="cr">
+                <div><span class="flabel">Category</span><span class="cat ${s.category}">${s.category}</span></div>
+                <div><span class="flabel">Title</span><div class="fval">${esc(s.title)}</div></div>
+                <div><span class="flabel">Rationale</span><div class="box">${esc(s.rationale)}</div></div>
+                <div><span class="flabel">Proposed change</span><div class="box code">${s.change.type}(${esc(params)})</div></div>
+                <div><span class="flabel">Preview</span><div class="seg" role="group"><button data-after="0" class="${after ? '' : 'on'}">Before</button><button data-after="1" class="${after ? 'on' : ''}">After</button></div></div>
+                <div><span class="flabel">Evidence</span>${s.evidence
+                  .map((e) => `<button class="evrow" data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}"><span class="st">§${e.step}</span><span>${esc(M.personaOf(M.agentById[e.agentId]).name)}</span><span class="muted" style="font-size:13px">${esc(M.taskById[e.taskId].short)}</span></button>`)
+                  .join('')}</div>
+              </div></section>`;
+          left.querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(s, b.dataset.after === '1')));
+          left.querySelectorAll('[data-ev-agent]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evAgent, taskId: b.dataset.evTask })));
+          right.innerHTML = `
+            <section class="panel"><div class="ph"><h2>Suggestions</h2><span class="count num">${M.suggestions.length}</span></div>
+              <ol class="sglist">${M.suggestions
+                .map((x, i) => `<li><button class="${x.id === s.id ? 'on' : ''}" data-sug="${x.id}"><span class="n num">${i + 1}</span><span class="t">${esc(x.title)}</span><span><span class="cat ${x.category}">${x.category}</span></span></button></li>`)
+                .join('')}</ol></section>`;
+          right.querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => { sb.suggestionId = b.dataset.sug; after = false; renderSandbox(); }));
+          setTimeout(() => { if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) setAfter(s, true); }, 900);
+          return;
+        }
+
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const outcome = a.outcomes[sb.taskId];
+        const steps = stepsFor();
+        $('#sb-kind-label').textContent = 'Session';
+        $('#sb-title').textContent = `${p.name} · ${t ? t.name : ''}`;
+        $('#sb-kind').innerHTML = sb.kind === 'live' ? `<span class="badge active">Live</span>` : `<span class="badge pending">Replay</span>`;
+        $('#obs-sub').textContent = sb.kind === 'live' ? 'Live feed' : 'Recorded session';
+
+        const alert = outcome === 'failed' || outcome === 'errored';
+        left.innerHTML = `
+          <section class="panel"><div class="ph"><h2>Participant</h2><span class="count">${badge(a.status === 'working' ? 'active' : a.status)}</span></div>
+            <div class="card">
+              <div class="who"><span class="avatar">${esc(p.name[0])}</span><div><h3>${esc(p.name)}</h3><span class="muted" style="font-size:14px">${p.age} · ${p.gender}</span></div></div>
+              <div><span class="flabel">Modifiers</span>${p.modifiers.length ? `<div class="chips">${p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('')}</div>` : '<span class="muted">None</span>'}</div>
+            </div></section>
+          ${alert ? `<div class="alert ${outcome === 'errored' ? 'med' : ''}" role="alert">${outcome === 'errored' ? icon.med : icon.high}<div><h4>${outcome === 'errored' ? 'Medium priority · Errored' : 'High priority · Task failed'}</h4><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div></div>` : ''}
+          <section class="panel"><div class="ph"><h2>Current step</h2></div><div class="card" id="step-card"></div></section>
+          <section class="panel"><div class="ph"><h2>Tasks</h2><span class="count num">${Object.keys(a.outcomes).length} of ${M.tasks.length} scored</span></div>
+            <ol class="atlist">${M.tasks
+              .map((x, i) => {
+                const o = a.outcomes[x.id];
+                const live = a.currentTaskId === x.id && !o;
+                const has = M.historyOf(a.id, x.id).length > 0;
+                return `<li><button class="${x.id === sb.taskId ? 'on' : ''}" data-task="${x.id}" data-live="${live ? 1 : 0}" ${has ? '' : 'disabled'}><span class="n num">${i + 1}</span><span>${esc(x.short)}</span>${badge(o || (live ? 'active' : 'pending'))}</button></li>`;
+              })
+              .join('')}</ol></section>`;
+        left.querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.task })),
+        );
+
+        right.innerHTML = `
+          <section class="panel transcript"><div class="ph"><h2>Transcript</h2><span class="count num">${steps.length} steps</span></div>
+            <div class="pb" style="padding:0" id="tx-scroll"><ol class="tx" id="tx">${steps
+              .map((s, i) => `<li data-i="${i}"><span class="ts num">${s.at}</span><span class="ac">${esc(s.action)}</span><span class="rs">${esc(s.reasoning)}</span></li>`)
+              .join('')}</ol></div></section>`;
+
+        if (sb.kind === 'replay') {
+          $('#scrub').max = steps.length;
+          $('#steps').innerHTML = steps.map((s, i) => `<li><button data-i="${i}"><b>${i + 1}</b>${esc(s.action)}</button></li>`).join('');
+          $('#steps').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+        }
+        renderStep();
+      }
+
+      const cap = (label, val) => `<div><span class="flabel">${label}</span><span class="fval">${val}</span></div>`;
+
+      function setAfter(s, v) {
+        after = v;
+        $('#sb-left').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+        $('#viewport').className = 'viewport' + (v ? ' after-' + s.change.type : '');
+        const c = $('#cap-ba');
+        if (c) c.textContent = v ? 'After' : 'Before';
+      }
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.includes('press select')) return 'basal';
+        if (seen.some((a) => a.startsWith('hold up') || a === 'press up')) return 'bolus';
+        if (seen.includes('press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = shownStep();
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const outcome = a.outcomes[sb.taskId];
+        const scr = screenFor(shown, steps, t);
+        const label = sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`;
+        const status = sb.kind === 'live' ? 'active' : shown >= steps.length ? outcome || 'pending' : 'active';
+        $('#capbar').innerHTML =
+          cap('Persona', esc(M.personaOf(a).name)) + cap('Task', esc(t ? t.short : '')) + cap('Step', `<span class="num">${label}</span>`) + cap('Status', badge(status));
+        $('#step-card').innerHTML = `
+          <div><span class="flabel">${label} · ${esc(t ? t.short : '')}</span><div class="bigaction">${cur ? esc(cur.action) : 'Awaiting first action'}</div></div>
+          ${cur ? `<div><span class="flabel">Reasoning</span><div class="box quote">“${esc(cur.reasoning)}”</div></div>` : ''}
+          ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: scr })}<figcaption><span class="flabel" style="display:inline;margin-right:6px">Agent view</span>heard confirmation beep</figcaption></figure>` : ''}`;
+        const stage = $('#stage');
+        const pressed = cur && cur.action.match(/^(press|hold) (\w+)/);
+        if (stage.dataset.screen !== scr) {
+          stage.dataset.screen = scr;
+          stage.innerHTML = M.pumpSvg({ screen: scr });
+        }
+        stage.querySelectorAll('.key').forEach((k) => k.classList.toggle('pressed', !!pressed && k.dataset.button === pressed[2]));
+        $('#tx').querySelectorAll('li').forEach((li, i) => {
+          li.className = i === shown - 1 ? 'cur' : i >= shown ? 'fut' : '';
+          if (i === shown - 1) li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+        if (sb.kind === 'replay') renderTransport();
+      }
+
+      /* transport */
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing) return;
+          if (replay.cursor >= stepsFor().length) { replay.playing = false; return renderTransport(); }
+          replay.cursor += 1;
+          renderStep();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = Math.max(0, Math.min(stepsFor().length, n));
+        renderStep();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const ended = replay.cursor >= n;
+        $('#scrub').value = replay.cursor;
+        $('#stepof').textContent = `Step ${replay.cursor} of ${n}`;
+        $('#play').textContent = replay.playing && !ended ? 'Pause' : ended ? 'Replay' : 'Play';
+        $('#steps').querySelectorAll('button').forEach((b, i) => {
+          b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+          if (i === replay.cursor) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+        });
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) { replay.cursor = 0; replay.playing = true; renderStep(); }
+        else { replay.playing = !replay.playing; renderTransport(); }
+      });
+      $('#prev').addEventListener('click', () => scrub(replay.cursor - 1));
+      $('#next').addEventListener('click', () => scrub(replay.cursor + 1));
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      function injectFx() {
+        $('#stage svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#1976d2"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#fff" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#f9a825" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+
+      /* cosmetic orbit */
+      (function orbit() {
+        const vp = $('#viewport');
+        const stage = $('#stage');
+        let drag = null, rx = -8, ry = 16, z = 1;
+        const apply = () => (stage.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, rx, ry }; vp.classList.add('dragging'); stage.style.transition = 'none'; });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => { drag = null; vp.classList.remove('dragging'); stage.style.transition = ''; });
+        vp.addEventListener('wheel', (e) => { e.preventDefault(); z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001)); apply(); }, { passive: false });
+      })();
+
+      /* mock controls */
+      document.addEventListener('mock:state', () => { renderDashboard(); if (sb && sb.kind !== 'change') renderSandbox(); });
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') return closeSandbox();
+        openSandbox(Object.assign({ kind: k }, M.defaults[k]));
+      });
+
+      renderDashboard();
+      M.mountControls();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Infallible · Protocol</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <style>
+      /* 18 Protocol: the run as a vertical stepper; one step open at a time, participants fixed on the right. */
+      :root {
+        --page: #f7f8f8;
+        --panel: #fff;
+        --ink: #16191c;
+        --muted: #69717a;
+        --faint: #a3aab1;
+        --line: rgba(0, 0, 0, 0.1);
+        --accent: #0f766e;
+        --accent-soft: #e6f2f1;
+        --ok: #1f8a4c;
+        --bad: #c23b32;
+        --r: 4px;
+        --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+        --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--page);
+        color: var(--ink);
+        font: 400 14px/1.5 var(--font);
+        font-variant-numeric: tabular-nums;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r); }
+      h1, h2, h3, p, ul, ol, figure, blockquote, dl, dd { margin: 0; padding: 0; }
+      ul, ol { list-style: none; }
+      code, .mono { font-family: var(--mono); font-size: 13px; }
+      .eyebrow { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.02em; }
+      .muted { color: var(--muted); }
+      .num { text-align: right; font-variant-numeric: tabular-nums; }
+      .link { color: var(--accent); font-weight: 500; }
+      .link:hover { text-decoration: underline; }
+      [hidden] { display: none !important; }
+
+      /* header */
+      .top { height: 72px; display: flex; align-items: center; gap: 32px; padding: 0 40px; border-bottom: 1px solid var(--line); background: var(--panel); }
+      .brand { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+      .facts { display: flex; gap: 32px; margin-left: auto; }
+      .fact { display: flex; flex-direction: column; }
+      .fact b { font-weight: 500; font-size: 14px; }
+      .fact .eyebrow { font-weight: 400; }
+      .state-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: 1px; }
+
+      /* dashboard grid */
+      #dashboard { height: calc(100% - 72px); display: grid; grid-template-columns: 3fr 2fr; gap: 32px; padding: 32px 40px; }
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); min-height: 0; display: flex; flex-direction: column; }
+      .panel-head { display: flex; align-items: baseline; justify-content: space-between; padding: 24px 32px 16px; }
+      .panel-head h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+      .scroll { overflow: auto; min-height: 0; }
+
+      /* stepper */
+      .stepper { padding: 0 32px 24px; }
+      .step { position: relative; padding-left: 48px; }
+      .step::before { content: ''; position: absolute; left: 13.5px; top: 40px; bottom: -4px; width: 1px; background: var(--line); }
+      .step:last-child::before { display: none; }
+      .step.done::before { background: var(--accent); opacity: 0.4; }
+      .step-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; width: 100%; min-height: 40px; padding: 8px 0; }
+      .step-head .disc { position: absolute; left: 0; top: 6px; }
+      .step-head .name { font-size: 15px; font-weight: 500; transition: color 0.15s; }
+      button.step-head:hover .name { color: var(--accent); }
+      .step.open .step-head .name { font-weight: 600; }
+      .step-body { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.2s var(--ease), opacity 0.2s var(--ease); }
+      .step.open .step-body { grid-template-rows: 1fr; opacity: 1; }
+      .step-body > div { overflow: hidden; }
+      .step-inner { padding: 8px 0 24px; display: grid; gap: 16px; }
+      blockquote { border-left: 2px solid var(--accent); padding-left: 16px; color: #3b4148; font-size: 14px; }
+      dl.kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; }
+      dl.kv dt { color: var(--muted); font-size: 13px; }
+      dl.kv dd { font-size: 14px; }
+
+      /* discs: the only round elements */
+      .disc { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 600; color: var(--faint); border: 1px solid #c9ced3; background: var(--panel); position: relative; }
+      .disc.done { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .disc.active { border: 2px solid var(--accent); color: var(--accent); }
+      .disc.sm { width: 22px; height: 22px; font-size: 11px; }
+      .disc.on { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4px var(--accent); }
+      .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--accent); animation: spin 0.9s linear infinite; display: inline-block; flex: none; }
+      .disc .spin { position: absolute; inset: -2px; width: auto; height: auto; }
+      body:not([data-state='running']) .spin.live { display: none; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* rows: glyph · title · meta */
+      .rows { border-top: 1px solid var(--line); }
+      .row { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 12px; width: 100%; min-height: 40px; padding: 8px; border-bottom: 1px solid var(--line); transition: background 0.15s; }
+      .row:not(:disabled):hover { background: var(--page); }
+      .row.on { background: var(--accent-soft); }
+      .row:disabled { color: var(--faint); }
+      .row .meta { color: var(--muted); font-size: 13px; display: flex; gap: 16px; align-items: center; justify-content: flex-end; }
+      .g { width: 16px; height: 16px; display: block; }
+      .g.passed { color: var(--ok); }
+      .g.failed, .g.errored { color: var(--bad); }
+      .g.pending { color: #c9ced3; }
+
+      /* participants */
+      .prow { grid-template-columns: 32px 1fr auto; min-height: 64px; padding: 12px 8px; }
+      .avatar { width: 32px; height: 32px; border-radius: var(--r); background: var(--page); border: 1px solid var(--line); display: grid; place-items: center; font-weight: 600; font-size: 14px; color: var(--accent); }
+      .prow .sub { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+      .prow .sub .spin { width: 12px; height: 12px; }
+      .score { display: flex; gap: 12px; font-size: 13px; color: var(--muted); }
+      .score b { font-weight: 600; }
+      .score .p b { color: var(--ok); }
+      .score .f b { color: var(--bad); }
+      .side { display: flex; flex-direction: column; gap: 32px; min-height: 0; }
+      .side .panel:first-child { flex: 1; }
+      .runfacts { padding: 0 32px 24px; }
+
+      /* sandbox */
+      #sandbox { height: calc(100% - 72px); display: grid; grid-template-columns: 56px 1fr 360px; }
+      .rail { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px 0; position: relative; }
+      .rail button { position: relative; border-radius: 50%; }
+      .rail button:hover .disc { border-color: var(--accent); }
+      .center { display: flex; flex-direction: column; min-width: 0; padding: 24px 32px; gap: 16px; }
+      .mini { display: flex; gap: 24px; justify-content: center; }
+      .mini button { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 0 4px; border-radius: var(--r); transition: color 0.15s; }
+      .mini button:not(:disabled):hover { color: var(--ink); }
+      .mini button.on { color: var(--accent); font-weight: 500; }
+      .mini button:disabled { opacity: 0.45; }
+      .mini .disc.failed, .mini .disc.errored { border-color: var(--bad); color: var(--bad); }
+      .mini .disc.passed { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .viewport { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; cursor: grab; user-select: none; background: #f1f2f2; border-radius: var(--r); overflow: hidden; }
+      .viewport.dragging { cursor: grabbing; }
+      .stage { height: 82%; aspect-ratio: 180 / 320; position: relative; transition: transform 0.25s var(--ease); }
+      .stage svg { width: 100%; height: 100%; display: block; }
+      .shadow { position: absolute; left: 50%; bottom: 5%; width: 30%; height: 20px; transform: translateX(-50%); background: radial-gradient(closest-side, rgba(0, 0, 0, 0.16), transparent); }
+      .stage .key, .stage .screen text, .stage .fx { transition: transform 0.6s var(--ease), opacity 0.4s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .stage .fx { opacity: 0; }
+      .stage .key.pressed rect { fill: #0f766e; }
+      .viewport.after-move_button .key-select { transform: translateY(16px); }
+      .viewport.after-resize_text .screen text { transform: scale(1.5); }
+      .viewport.after-confirm_dialog .fx-dialog, .viewport.after-change_timeout .fx-timeout, .viewport.after-add_audio_cue .fx-audio { opacity: 1; }
+      .vp-label { position: absolute; left: 16px; top: 12px; font-size: 12px; color: var(--muted); }
+      .transport { display: grid; grid-template-columns: 32px 160px 1fr; gap: 16px; align-items: center; height: 40px; }
+      .icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); transition: color 0.15s, border-color 0.15s; }
+      .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+      input[type='range'] { width: 100%; accent-color: var(--accent); }
+      .chips-steps { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+      .chips-steps button { white-space: nowrap; font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--r); color: var(--faint); background: var(--panel); }
+      .chips-steps button:hover { border-color: var(--accent); }
+      .chips-steps button.done { color: var(--muted); }
+      .chips-steps button.next { color: var(--accent); border-color: var(--accent); }
+      .chips-steps sup { font-size: 10px; margin-right: 4px; }
+      .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; align-self: center; background: var(--panel); }
+      .seg button { padding: 8px 24px; color: var(--muted); transition: background 0.2s, color 0.2s; }
+      .seg button:not(.on):hover { color: var(--ink); }
+      .seg button.on { background: var(--accent); color: #fff; }
+      .right { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; }
+      .card { padding: 24px; border-bottom: 1px solid var(--line); display: grid; gap: 12px; }
+      .card h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+      .who { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; }
+      .pill { font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: var(--r); color: var(--accent); }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip { font-size: 12px; padding: 2px 8px; background: var(--page); border-radius: var(--r); color: #3b4148; }
+      .action { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; animation: fade 0.25s var(--ease); }
+      @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+      .frame { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+      .frame svg { display: block; width: 100%; }
+      .frame figcaption { font-size: 12px; color: var(--muted); padding: 8px 12px; }
+      .failure p { color: #3b4148; }
+      .failure .eyebrow { color: var(--bad); display: flex; gap: 8px; align-items: center; }
+      .cat { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+      .cat::before { content: ''; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+      .cat.hardware { --c: #b7791f; }
+      .cat.firmware { --c: #3b6fb6; }
+      .cat.interaction { --c: #0f766e; }
+      .card .row { padding: 8px 4px; }
+
+      @media (max-width: 1240px) {
+        .top, #dashboard { padding-left: 32px; padding-right: 32px; }
+        .facts { gap: 24px; }
+        #sandbox { grid-template-columns: 56px 1fr 320px; }
+        .mini { gap: 8px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+        .spin { animation: spin 2s linear infinite !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <header class="top">
+      <div class="brand">Infallible</div>
+      <button class="link" id="sb-back" hidden>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align: -3px; margin-right: 4px"><path d="M10 3 5 8l5 5" /></svg>Back to run
+      </button>
+      <div id="sb-title" class="muted" hidden></div>
+      <div class="facts">
+        <div class="fact"><span class="eyebrow">Run</span><b class="mono" id="run-id"></b></div>
+        <div class="fact"><span class="eyebrow">State</span><b><span class="state-dot"></span><span id="run-state"></span></b></div>
+        <div class="fact"><span class="eyebrow">Started</span><b id="run-started"></b></div>
+        <div class="fact"><span class="eyebrow">Progress</span><b id="run-progress"></b></div>
+      </div>
+    </header>
+
+    <main id="dashboard">
+      <section class="panel">
+        <div class="panel-head"><h2>Protocol</h2><span class="eyebrow" id="steps-count"></span></div>
+        <div class="scroll"><ol class="stepper" id="stepper"></ol></div>
+      </section>
+      <aside class="side">
+        <section class="panel">
+          <div class="panel-head"><h2>Participants</h2><span class="eyebrow num" id="p-count"></span></div>
+          <div class="scroll" style="padding: 0 24px 16px"><ul class="rows" id="participants"></ul></div>
+        </section>
+        <section class="panel" style="flex: none">
+          <div class="panel-head"><h2 style="font-size: 18px">Run</h2></div>
+          <dl class="kv runfacts" id="runfacts"></dl>
+        </section>
+      </aside>
+    </main>
+
+    <main id="sandbox" hidden>
+      <nav class="rail" id="rail" aria-label="Protocol steps"></nav>
+      <section class="center">
+        <div class="mini" id="mini"></div>
+        <div class="viewport" id="viewport">
+          <span class="vp-label" id="vp-label"></span>
+          <div class="shadow"></div>
+          <div class="stage" id="stage"></div>
+        </div>
+        <div class="transport" id="transport">
+          <button class="icon-btn" id="play" aria-label="Play or pause">
+            <svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.5"><path id="play-icon" d="M5 3.5v9l7-4.5z" fill="currentColor" /></svg>
+          </button>
+          <input type="range" id="scrub" min="0" value="0" aria-label="Scrub" />
+          <ol class="chips-steps" id="chips"></ol>
+        </div>
+        <div class="seg" id="seg" hidden><button data-after="0" class="on">Before</button><button data-after="1">After</button></div>
+      </section>
+      <aside class="right" id="right"></aside>
+    </main>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const state = () => document.body.dataset.state || 'running';
+      const check = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3.5 8.5 3 3 6-7"/></svg>';
+      const G = {
+        passed: '<path d="m3.5 8.5 3 3 6-7"/>',
+        failed: '<path d="m4 4 8 8M12 4l-8 8"/>',
+        errored: '<path d="M8 3.5v6M8 12v.5"/>',
+        pending: '<circle cx="8" cy="8" r="2.5"/>',
+      };
+      function glyph(st) {
+        if (st === 'active') return '<span class="spin live"></span>';
+        return `<svg class="g ${st}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${G[st] || G.pending}</svg>`;
+      }
+      function disc(st, n, extra = '') {
+        if (st === 'done') return `<span class="disc done ${extra}">${check}</span>`;
+        if (st === 'active') return `<span class="disc active ${extra}">${n}<span class="spin live"></span></span>`;
+        return `<span class="disc ${extra}">${n}</span>`;
+      }
+      const scored = (tid) => M.agents.filter((a) => tid in a.outcomes).length;
+      const showSuggest = () => state() !== 'running';
+
+      let openTask = (M.tasks.find((t) => M.taskStatus(t.id) === 'active') || M.tasks[0]).id;
+      let sb = null;
+      let replay = { cursor: 0, playing: true, timer: null };
+      let flipTimer = null;
+
+      /* ---- header ---- */
+      function renderHeader() {
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-state').textContent = state()[0].toUpperCase() + state().slice(1);
+        $('#run-started').textContent = M.run.startedAt;
+        $('#run-progress').textContent = `${done} of ${M.tasks.length} steps complete`;
+        return done;
+      }
+
+      /* ---- dashboard ---- */
+      function renderDashboard() {
+        const done = renderHeader();
+        $('#steps-count').textContent = `${done} / ${M.tasks.length} done`;
+        let html = M.tasks
+          .map((t, i) => {
+            const st = M.taskStatus(t.id);
+            return `<li class="step ${st} ${t.id === openTask ? 'open' : ''}" data-step="${t.id}">
+              <button class="step-head" data-toggle="${t.id}" aria-expanded="${t.id === openTask}">${disc(st, i + 1)}<span class="name">${esc(t.name)}</span><span class="eyebrow num">${scored(t.id)}/${M.agents.length} scored</span></button>
+              <div class="step-body"><div>${stepBody(t)}</div></div></li>`;
+          })
+          .join('');
+        if (showSuggest()) {
+          const ev = state() === 'evaluating';
+          html += `<li class="step"><div class="step-head">${ev ? '<span class="disc active">6<span class="spin"></span></span>' : disc('done', 6)}<span class="name">${ev ? 'Evaluating' : 'Suggestions'}</span>${
+            ev ? '<span class="eyebrow">Scoring and drafting changes</span>' : `<button class="link" data-open-change>See ${M.suggestions.length} suggestions</button>`
+          }</div></li>`;
+        }
+        $('#stepper').innerHTML = html;
+        $('#stepper').querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => toggle(b.dataset.toggle)));
+        $('#stepper').querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, b.dataset.task)));
+        const oc = $('[data-open-change]');
+        if (oc) oc.addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+
+        $('#p-count').textContent = M.agents.length;
+        $('#participants').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const t = M.taskById[a.currentTaskId];
+            const sub = state() === 'completed' ? 'done' : a.status === 'error' ? 'error' : `<span class="spin live"></span>${esc(t ? t.short : a.status)}`;
+            return `<li><button class="row prow" data-p="${a.id}"><span class="avatar">${esc(p.name[0])}</span><span><span style="font-weight:500">${esc(p.name)}</span> <span class="muted">${p.age}</span><span class="sub">${sub}</span></span><span class="score"><span class="p"><b>${a.passed}</b> pass</span><span class="f"><b>${a.failed + a.errored}</b> fail</span></span></button></li>`;
+          })
+          .join('');
+        $('#participants').querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.p, null)));
+        $('#runfacts').innerHTML = `<dt>ID</dt><dd class="mono">${esc(M.run.id.slice(0, 8))}</dd><dt>Started</dt><dd>${esc(M.run.startedAt)}</dd><dt>State</dt><dd>${esc(state())}</dd>`;
+      }
+
+      function stepBody(t) {
+        const rows = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const o = a.outcomes[t.id];
+            const live = a.currentTaskId === t.id && !o;
+            const st = o || (live ? 'active' : 'pending');
+            const n = M.historyOf(a.id, t.id).length;
+            return `<li><button class="row" data-agent="${a.id}" data-task="${t.id}" ${st === 'pending' ? 'disabled' : ''}>${glyph(st)}<span>${esc(p.name)}</span><span class="meta"><span class="num">${n ? n + ' steps' : '—'}</span><span class="link" style="min-width:40px">${st === 'pending' ? '' : st === 'active' ? 'Watch' : 'Open'}</span></span></button></li>`;
+          })
+          .join('');
+        return `<div class="step-inner">
+          <blockquote>${esc(t.description)}</blockquote>
+          <dl class="kv"><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Predicate</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd>${t.maxSteps}</dd></dl>
+          <div><div class="eyebrow" style="margin-bottom:8px">Participants on this step</div><ul class="rows">${rows}</ul></div></div>`;
+      }
+
+      function toggle(id) {
+        openTask = id;
+        $('#stepper').querySelectorAll('[data-step]').forEach((li) => {
+          li.classList.toggle('open', li.dataset.step === id);
+          li.querySelector('[data-toggle]').setAttribute('aria-expanded', li.dataset.step === id);
+        });
+      }
+
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (state() === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId))
+          return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        openSandbox({ kind: 'replay', agentId, taskId: taskId || Object.keys(a.outcomes).pop() || a.currentTaskId });
+      }
+
+      /* ---- sandbox ---- */
+      function openSandbox(mode) {
+        sb = mode;
+        clearInterval(replay.timer);
+        clearTimeout(flipTimer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#dashboard').hidden = true;
+        $('#sandbox').hidden = false;
+        $('#sb-back').hidden = false;
+        $('#sb-title').hidden = false;
+        $('#stage').dataset.screen = '';
+        renderSandbox();
+        if (mode.kind === 'replay') startReplay();
+      }
+      function closeSandbox() {
+        clearInterval(replay.timer);
+        clearTimeout(flipTimer);
+        sb = null;
+        $('#sandbox').hidden = true;
+        $('#dashboard').hidden = false;
+        $('#sb-back').hidden = true;
+        $('#sb-title').hidden = true;
+        renderDashboard();
+      }
+      $('#sb-back').addEventListener('click', closeSandbox);
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sb) closeSandbox();
+      });
+
+      function renderRail() {
+        const cur = sb && sb.kind !== 'change' ? sb.taskId : null;
+        let html = M.tasks
+          .map((t, i) => `<button data-rail="${t.id}" title="${esc(t.short)}" aria-label="Step ${i + 1}: ${esc(t.short)}">${disc(M.taskStatus(t.id), i + 1, 'sm' + (t.id === cur ? ' on' : ''))}</button>`)
+          .join('');
+        if (showSuggest() || (sb && sb.kind === 'change'))
+          html += `<button data-rail="change" title="Suggestions" aria-label="Step 6: Suggestions">${disc(state() === 'evaluating' ? 'pending' : 'done', 6, 'sm' + (sb && sb.kind === 'change' ? ' on' : ''))}</button>`;
+        $('#rail').innerHTML = html;
+        $('#rail').querySelectorAll('[data-rail]').forEach((b) =>
+          b.addEventListener('click', () => {
+            if (b.dataset.rail === 'change') return openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id });
+            openTask = b.dataset.rail;
+            closeSandbox();
+          }),
+        );
+      }
+
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((a) => a === 'press select')) return 'basal';
+        if (seen.some((a) => a.startsWith('hold up') || a === 'press up')) return 'bolus';
+        if (seen.some((a) => a === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderSandbox() {
+        renderRail();
+        const right = $('#right');
+        const change = sb.kind === 'change';
+        $('#viewport').className = 'viewport';
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#seg').hidden = !change;
+        $('#mini').hidden = change;
+
+        if (change) {
+          const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+          $('#sb-title').textContent = `Suggestion ${M.suggestions.indexOf(s) + 1} of ${M.suggestions.length}`;
+          $('#vp-label').textContent = 'Proposed change';
+          $('#stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+          injectFx();
+          $('#seg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.after === '0'));
+          right.innerHTML = `
+            <div class="card">
+              <span class="cat ${s.category}">${esc(s.category)}</span>
+              <h3>${esc(s.title)}</h3>
+              <p class="muted">${esc(s.rationale)}</p>
+              <dl class="kv" style="grid-template-columns:64px 1fr"><dt>Change</dt><dd><code>${esc(s.change.type)}</code></dd><dt>Params</dt><dd><code>${esc(Object.entries(s.change.params).map(([k, v]) => `${k}=${v}`).join(', '))}</code></dd></dl>
+            </div>
+            <div class="card"><div class="eyebrow">Evidence</div><ul class="rows">${s.evidence
+              .map(
+                (e) =>
+                  `<li><button class="row" data-ev-a="${e.agentId}" data-ev-t="${e.taskId}">${glyph(M.agentById[e.agentId].outcomes[e.taskId] || 'pending')}<span>${esc(M.personaOf(M.agentById[e.agentId]).name)} <span class="muted">· ${esc(M.taskById[e.taskId].short)}</span></span><span class="meta num">§${e.step}</span></button></li>`,
+              )
+              .join('')}</ul></div>
+            <div class="card"><div class="eyebrow">All suggestions</div><ul class="rows">${M.suggestions
+              .map(
+                (x, j) =>
+                  `<li><button class="row ${x.id === s.id ? 'on' : ''}" data-sug="${x.id}"><span class="eyebrow num">${j + 1}</span><span>${esc(x.title)}</span><span class="meta"><span class="cat ${x.category}" title="${esc(x.category)}"></span></span></button></li>`,
+              )
+              .join('')}</ul></div>`;
+          right.querySelectorAll('[data-ev-a]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evA, taskId: b.dataset.evT })));
+          right.querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: b.dataset.sug })));
+          flipTimer = setTimeout(() => setAfter(true), 900);
+          return;
+        }
+
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const o = a.outcomes[sb.taskId];
+        const steps = stepsFor();
+        $('#sb-title').textContent = `${p.name} · ${t.short}`;
+        $('#vp-label').textContent = sb.kind === 'live' ? 'Live' : 'Replay';
+
+        $('#mini').innerHTML = M.tasks
+          .map((x, i) => {
+            const xo = a.outcomes[x.id];
+            const live = a.currentTaskId === x.id && !xo;
+            const has = M.historyOf(a.id, x.id).length > 0;
+            const cls = 'sm ' + (xo || '') + (x.id === sb.taskId ? ' on' : '');
+            const d = live ? disc('active', i + 1, cls) : `<span class="disc ${cls}">${xo === 'passed' ? check : xo ? '✕' : i + 1}</span>`;
+            return `<button data-mt="${x.id}" data-live="${live ? 1 : 0}" class="${x.id === sb.taskId ? 'on' : ''}" ${has ? '' : 'disabled'}>${d}<span>${esc(x.short)}</span></button>`;
+          })
+          .join('');
+        $('#mini').querySelectorAll('[data-mt]').forEach((b) =>
+          b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.mt })),
+        );
+
+        right.innerHTML = `
+          <div class="card">
+            <div class="who"><span class="avatar">${esc(p.name[0])}</span><div><h3>${esc(p.name)}</h3><span class="muted" style="font-size:13px">${p.age}, ${esc(p.gender)}</span></div><span class="pill">${esc(a.status)}</span></div>
+            ${p.modifiers.length ? `<div class="chips">${p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('')}</div>` : '<span class="muted" style="font-size:13px">No modifiers</span>'}
+          </div>
+          <div class="card" id="step-card"></div>
+          ${o === 'failed' || o === 'errored' ? `<div class="card failure"><span class="eyebrow">${glyph(o)}${o === 'errored' ? 'Errored' : 'Failed'}</span><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>` : ''}`;
+        renderStep();
+
+        if (sb.kind === 'replay') {
+          $('#scrub').max = steps.length;
+          $('#chips').innerHTML = steps.map((s, i) => `<li><button data-i="${i}"><sup>${i + 1}</sup>${esc(s.action)}</button></li>`).join('');
+          $('#chips').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+          renderTransport();
+        }
+      }
+
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const scr = screenFor(shown, steps, t);
+        $('#step-card').innerHTML = `
+          <span class="eyebrow">${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${esc(t.short)}</span>
+          <div class="action">${cur ? esc(cur.action) : 'Waiting to start'}</div>
+          ${cur ? `<blockquote>${esc(cur.reasoning)}</blockquote>` : ''}
+          ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: scr })}<figcaption>Heard confirmation beep (4 kHz, 80 ms)</figcaption></figure>` : ''}`;
+        const stage = $('#stage');
+        const m = cur && cur.action.match(/^(press|hold) (\w+)/);
+        if (stage.dataset.screen !== scr) {
+          stage.dataset.screen = scr;
+          stage.innerHTML = M.pumpSvg({ screen: scr });
+        }
+        stage.querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', !!m && k.dataset.button === m[2]));
+      }
+
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing) return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            return renderTransport();
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const playing = replay.playing && replay.cursor < n;
+        $('#scrub').value = replay.cursor;
+        $('#play-icon').setAttribute('d', playing ? 'M5 3.5v9M11 3.5v9' : 'M5 3.5v9l7-4.5z');
+        $('#play-icon').setAttribute('fill', playing ? 'none' : 'currentColor');
+        const chips = $('#chips');
+        chips.querySelectorAll('button').forEach((b, i) => {
+          b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+          if (i === replay.cursor) chips.scrollLeft = b.offsetLeft - chips.offsetLeft - chips.clientWidth / 2 + b.offsetWidth / 2;
+        });
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      });
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      /* change mode */
+      function injectFx() {
+        $('#stage svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#1b1a17"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#f4f1ea" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#ffb84d" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+      function setAfter(v) {
+        if (!sb || sb.kind !== 'change') return;
+        const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+        $('#seg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+        $('#viewport').className = 'viewport' + (v ? ' after-' + s.change.type : '');
+      }
+      $('#seg').querySelectorAll('button').forEach((b) =>
+        b.addEventListener('click', () => {
+          clearTimeout(flipTimer);
+          setAfter(b.dataset.after === '1');
+        }),
+      );
+
+      /* cosmetic orbit */
+      (function orbit() {
+        const vp = $('#viewport');
+        const stage = $('#stage');
+        let drag = null;
+        let rx = -4;
+        let ry = 12;
+        let z = 1;
+        const apply = () => (stage.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => {
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          stage.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          drag = null;
+          vp.classList.remove('dragging');
+          stage.style.transition = '';
+        });
+        vp.addEventListener(
+          'wheel',
+          (e) => {
+            e.preventDefault();
+            z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+            apply();
+          },
+          { passive: false },
+        );
+      })();
+
+      /* mock controls */
+      document.addEventListener('mock:state', () => {
+        renderDashboard();
+        if (sb) renderRail();
+      });
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') return closeSandbox();
+        if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+        openSandbox({ kind: k, ...M.defaults[k] });
+      });
+
+      renderDashboard();
+      M.mountControls();
+    </script>
+  </body>
+</html>

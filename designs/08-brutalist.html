@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brutalist · Infallible design 08</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+/* 08 · Brutalist — raw tables, exposed grid lines, 2px black borders, three signal colours. */
+:root{--k:#000;--w:#fff;--y:#ffe600;--r:#ff2d1a;--g:#00c853;--b:2px solid #000;
+--sans:'Space Grotesk','Archivo','Helvetica Neue',Arial,sans-serif;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+--s1:8px;--s2:16px;--s3:24px;--s4:32px}
+*{box-sizing:border-box;border-radius:0!important;box-shadow:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--w);color:var(--k);font:15px/1.4 var(--sans);overflow:hidden}
+h1,h2,h3,p,ul,ol{margin:0;padding:0;list-style:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+button:disabled{cursor:not-allowed;color:#888}
+:focus-visible{outline:3px solid var(--k);outline-offset:-3px;background:var(--y)}
+.mono,code{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.big{font-size:36px;font-weight:700;text-transform:uppercase;letter-spacing:-.04em;line-height:.9}
+/* header */
+main{height:100%;display:flex;flex-direction:column}
+.bar{background:var(--k);color:var(--w);display:grid;grid-template-columns:1fr auto;align-items:end;border-bottom:var(--b)}
+.bar h1{font-size:76px;font-weight:700;letter-spacing:-.06em;line-height:.8;padding:var(--s3) var(--s4) 6px;text-transform:uppercase}
+.bar dl{display:grid;grid-template-columns:repeat(4,auto);margin:0;border-left:2px solid var(--w)}
+.bar dl div{padding:var(--s2) var(--s3);border-left:2px solid var(--w);font-family:var(--mono);font-size:13px}
+.bar dl div:first-child{border-left:0}
+.bar dt{font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.1em}
+.bar dd{margin:4px 0 0;font-size:18px;font-weight:700;text-transform:uppercase}
+body[data-state=running] #st{background:var(--y);color:var(--k);padding:0 6px}
+body[data-state=completed] #st{background:var(--g);color:var(--k);padding:0 6px}
+.dash{flex:1;min-height:0;overflow-y:auto;padding:var(--s3) var(--s4)}
+.sec{margin-bottom:var(--s3)}
+.sec-h{display:flex;align-items:end;justify-content:space-between;border:var(--b);border-bottom:0;padding:var(--s2)}
+.sec-h .mono{font-size:14px}
+/* tables */
+table{width:100%;border-collapse:collapse;border:var(--b)}
+th,td{border:var(--b);padding:9px var(--s2);text-align:left;vertical-align:middle}
+th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;background:var(--w)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover>td{background:var(--y)}
+tr.on>td{background:var(--y)}
+td.n{font-family:var(--mono);width:56px;font-weight:700}
+td.name{font-size:18px;font-weight:500}
+td.r,th.r{text-align:right}
+.badge{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;padding:3px 8px;border:var(--b);background:var(--w);white-space:nowrap}
+.badge.done,.badge.passed{background:var(--g)}
+.badge.failed,.badge.errored,.badge.error{background:var(--r);color:var(--w)}
+.badge.active{background:var(--y)}
+.badge.pending,.badge.disabled{color:#666;border-style:dashed}
+.spin{display:inline-block;width:10px;height:10px;border:2px solid var(--k);border-right-color:transparent;margin-right:6px;vertical-align:-1px;animation:spin .8s steps(8) infinite}
+body[data-state=completed] .spin{display:none}
+.only-ev,.only-co{display:none}
+body[data-state=evaluating] .only-ev,body[data-state=completed] .only-co{display:table-row}
+tr.only-co>td{background:var(--k);color:var(--w);font-weight:700;font-size:20px;text-transform:uppercase}
+tr.only-co:hover>td{background:var(--y);color:var(--k)}
+.detail>td{padding:0;background:var(--w)}
+.det{display:grid;grid-template-columns:1fr 1.1fr;animation:drop .25s ease-out both}
+.det>div{padding:var(--s3)}
+.det>div+div{border-left:var(--b)}
+.det blockquote{margin:0 0 var(--s2);font-size:17px;border-left:8px solid var(--k);padding-left:var(--s2)}
+.kv{display:grid;grid-template-columns:110px 1fr;border:var(--b);margin:0}
+.kv>*{padding:10px 12px;border-bottom:var(--b)}
+.kv>:nth-last-child(-n+2){border-bottom:0}
+.kv dt{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;border-right:var(--b)}
+.kv dd{margin:0}
+pre.code{margin:0;background:var(--k);color:var(--y);font:13px/1.5 var(--mono);padding:8px 10px;white-space:pre-wrap}
+.det table td,.det table th{padding:8px 12px}
+.open{border:var(--b);font-family:var(--mono);font-weight:700;font-size:12px;padding:4px 10px;background:var(--w)}
+.open:hover:not(:disabled){background:var(--k);color:var(--y)}
+.init{display:grid;place-items:center;width:36px;height:36px;background:var(--k);color:var(--w);font-size:20px;font-weight:700;flex-shrink:0}
+tr.click:hover .init{background:var(--w);color:var(--k);outline:var(--b)}
+td.ini{width:68px;padding:6px 16px}
+.p{color:#007a33;font-weight:700}.f{color:var(--r);font-weight:700}
+/* sandbox */
+#sandbox{position:fixed;inset:0;background:var(--w);display:grid;grid-template-rows:auto 1fr auto;z-index:5;animation:slam .2s ease-out both}
+#sandbox[hidden]{display:none}
+.sb-bar{display:grid;grid-template-columns:auto 1fr auto;background:var(--k);color:var(--w);border-bottom:var(--b);align-items:stretch}
+.sb-bar>*{padding:var(--s2) var(--s3)}
+.sb-bar .back{background:var(--y);color:var(--k);font-weight:700;font-size:18px;text-transform:uppercase;border-right:var(--b)}
+.sb-bar .back:hover{background:var(--w)}
+#sb-title{font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sb-kind{font-family:var(--mono);font-weight:700;border-left:2px solid var(--w)}
+.sb-grid{min-height:0;display:grid;grid-template-columns:340px 1fr 300px}
+.col{min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+.col.r{border-left:var(--b)}
+#sb-left{border-right:var(--b)}
+.blk{border-bottom:var(--b);padding:var(--s2) var(--s3)}
+.blk .lab{font-size:30px;font-weight:700;letter-spacing:-.04em;text-transform:uppercase;line-height:1;margin-bottom:var(--s2);display:flex;justify-content:space-between;align-items:baseline}
+.blk .lab small{font-family:var(--mono);font-size:12px;letter-spacing:0}
+.who{display:flex;gap:12px;align-items:center}
+.who h3{font-size:20px;line-height:1.1}
+.chips{display:flex;flex-wrap:wrap;margin-top:12px;border-left:var(--b);border-top:var(--b);width:max-content;max-width:100%}
+.chip{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;padding:4px 8px;border-right:var(--b);border-bottom:var(--b)}
+.action{font-size:30px;font-weight:700;line-height:1;text-transform:uppercase;letter-spacing:-.03em;margin:4px 0 12px;animation:drop .2s ease-out both}
+.reason{border-left:8px solid var(--k);padding-left:12px;font-size:15px}
+.frame{margin:var(--s2) 0 0;border:var(--b)}
+.frame svg{display:block;width:100%}
+.frame figcaption{border-top:var(--b);padding:6px 10px;font:12px var(--mono)}
+.fail{background:var(--r);color:var(--w)}
+.list{border:var(--b)}
+.list li{border-bottom:var(--b)}
+.list li:last-child{border-bottom:0}
+.list button{width:100%;display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:10px;padding:10px 12px}
+.list button:hover:not(:disabled){background:var(--y)}
+.list button.on{background:var(--y);font-weight:700}
+.list .ix{font-family:var(--mono);font-weight:700}
+.g{font-family:var(--mono);font-weight:700;display:inline-grid;place-items:center;width:24px;height:24px;border:var(--b);font-size:12px}
+.g.passed{background:var(--g)}.g.failed,.g.errored{background:var(--r);color:var(--w)}.g.active{background:var(--y)}
+/* viewport */
+.vp-wrap{min-width:0;min-height:0;padding:var(--s3);display:flex}
+.viewport{position:relative;flex:1;border:var(--b);overflow:hidden;cursor:grab;user-select:none;display:grid;place-items:center;
+background:repeating-linear-gradient(0deg,transparent 0 47px,#e4e4e4 47px 48px),repeating-linear-gradient(90deg,transparent 0 47px,#e4e4e4 47px 48px)}
+.viewport.dragging{cursor:grabbing}
+.viewport::before,.viewport::after,.cm::before,.cm::after{content:'';position:absolute;width:28px;height:28px;border:0 solid var(--k);z-index:2}
+.viewport::before{top:10px;left:10px;border-top-width:4px;border-left-width:4px}
+.viewport::after{bottom:10px;right:10px;border-bottom-width:4px;border-right-width:4px}
+.cm::before{top:10px;right:10px;border-top-width:4px;border-right-width:4px}
+.cm::after{bottom:10px;left:10px;border-bottom-width:4px;border-left-width:4px}
+.floor{position:absolute;left:-20%;right:-20%;bottom:-10%;height:46%;transform:perspective(500px) rotateX(62deg);transform-origin:bottom;
+background:repeating-linear-gradient(0deg,transparent 0 39px,#000 39px 41px),repeating-linear-gradient(90deg,transparent 0 39px,#000 39px 41px);opacity:.14}
+.shadow{position:absolute;bottom:13%;width:180px;height:22px;background:#000;opacity:.18}
+.vcap{position:absolute;left:10px;top:44px;background:var(--k);color:var(--w);font:700 11px var(--mono);padding:6px 10px;letter-spacing:.1em;z-index:3}
+.vhint{position:absolute;right:46px;bottom:12px;font:11px var(--mono);z-index:3}
+.stage{height:72%;aspect-ratio:180/320;transform-style:preserve-3d;transition:transform .4s ease-out;position:relative;z-index:1}
+.stage svg{width:100%;height:100%;display:block}
+.stage .key,.stage .screen text,.stage .fx{transition:transform .5s ease-out,opacity .4s;transform-box:fill-box;transform-origin:center}
+.stage .fx{opacity:0}
+.stage .key.pressed rect{fill:#ffe600}
+.stage .key.pressed text{fill:#000}
+.viewport.after-move_button .key-select{transform:translateY(16px)}
+.viewport.after-resize_text .screen text{transform:scale(1.5)}
+.viewport.after-confirm_dialog .fx-dialog,.viewport.after-change_timeout .fx-timeout,.viewport.after-add_audio_cue .fx-audio{opacity:1}
+/* transport */
+.transport{border-top:var(--b);display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto}
+.transport[hidden]{display:none}
+.play{grid-row:1/3;width:96px;background:var(--k);color:var(--y);font:700 15px var(--mono);border-right:var(--b);text-align:center}
+.play:hover{background:var(--y);color:var(--k)}
+.steps{display:flex;overflow-x:auto;border-bottom:var(--b);scrollbar-width:thin;min-width:0}
+.steps button{flex-shrink:0;min-width:120px;padding:8px 10px;border-right:var(--b);font:12px var(--mono);white-space:nowrap}
+.steps button b{display:block;font-size:20px}
+.steps button.done{background:var(--k);color:var(--w)}
+.steps button.next{background:var(--y)}
+.steps button:hover{outline:3px solid var(--y);outline-offset:-3px}
+.scrubrow{display:flex;align-items:center;gap:var(--s2);padding:10px var(--s2)}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:14px;background:var(--w);border:var(--b);cursor:pointer;margin:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:26px;background:var(--k);border:0}
+input[type=range]::-moz-range-thumb{width:18px;height:26px;background:var(--k);border:0;border-radius:0}
+/* change mode */
+.tag{font:700 11px var(--mono);text-transform:uppercase;padding:3px 8px;border:var(--b);display:inline-block}
+.tag.hardware{background:var(--k);color:var(--w)}.tag.firmware{background:var(--y)}.tag.interaction{background:var(--w)}
+.err h3{font-size:24px;line-height:1.05;text-transform:uppercase;letter-spacing:-.03em;margin:12px 0 8px}
+.ba{display:grid;grid-template-columns:1fr 1fr;border:var(--b);margin:var(--s2) 0}
+.ba button{padding:14px;font-size:24px;font-weight:700;text-transform:uppercase;text-align:center}
+.ba button+button{border-left:var(--b)}
+.ba button.on{background:var(--y)}
+.ba button:hover:not(.on){background:#f2f2f2}
+.mini td,.mini th{padding:6px 8px;font-size:13px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes drop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes slam{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:1250px){.sb-grid{grid-template-columns:300px 1fr 260px}.bar h1{font-size:56px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body data-state="running">
+<main id="dashboard">
+  <header class="bar">
+    <h1>Infallible</h1>
+    <dl>
+      <div><dt>Run</dt><dd id="run-id"></dd></div>
+      <div><dt>State</dt><dd><span id="st"></span></dd></div>
+      <div><dt>Started</dt><dd id="run-started"></dd></div>
+      <div><dt>Count</dt><dd id="counts"></dd></div>
+    </dl>
+  </header>
+  <div class="dash">
+    <section class="sec">
+      <div class="sec-h"><h2 class="big">Tasks</h2><span class="mono" id="tasks-count"></span></div>
+      <table><thead><tr><th>#</th><th>Name</th><th>Status</th><th class="r">Scored</th></tr></thead><tbody id="task-rows"></tbody></table>
+    </section>
+    <section class="sec">
+      <div class="sec-h"><h2 class="big">Personas</h2><span class="mono" id="personas-count"></span></div>
+      <table><thead><tr><th></th><th>Name</th><th>Age</th><th>Current task</th><th class="r">Pass</th><th class="r">Fail</th><th>Status</th></tr></thead><tbody id="persona-rows"></tbody></table>
+    </section>
+  </div>
+</main>
+
+<section id="sandbox" hidden>
+  <header class="sb-bar">
+    <button class="back" id="sb-back">&larr; Back</button>
+    <div id="sb-title"></div>
+    <div id="sb-kind"></div>
+  </header>
+  <div class="sb-grid">
+    <aside class="col" id="sb-left"></aside>
+    <div class="vp-wrap">
+      <div class="viewport" id="viewport">
+        <div class="cm"></div>
+        <div class="floor"></div><div class="shadow"></div>
+        <span class="vcap" id="vcap">VIEWPORT / ORBIT</span>
+        <div class="stage" id="stage"></div>
+        <span class="vhint">DRAG = ORBIT · WHEEL = ZOOM</span>
+      </div>
+    </div>
+    <aside class="col r" id="sb-right"></aside>
+  </div>
+  <footer class="transport" id="transport" hidden>
+    <button class="play" id="play">PAUSE</button>
+    <ol class="steps" id="steps"></ol>
+    <div class="scrubrow"><span class="mono" id="scrub-n">0/0</span><input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub" /></div>
+  </footer>
+</section>
+
+<script src="_shared/mock.js"></script>
+<script>
+const M = window.MOCK;
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const badge = (st) => `<span class="badge ${st}">${st === 'active' ? '<i class="spin"></i>' : ''}${st}</span>`;
+const g = (st) => `<span class="g ${st}">${st === 'passed' ? '✓' : st === 'failed' || st === 'errored' ? '✕' : st === 'active' ? '•' : ''}</span>`;
+const pad = (n) => String(n).padStart(2, '0');
+const onKey = (el, fn) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+
+let openTask = null;
+let sb = null;
+let replay = { cursor: 0, playing: true, timer: null };
+let after = false;
+
+function agentState(a, tid) {
+  const o = a.outcomes[tid];
+  if (o) return o;
+  if (a.currentTaskId === tid) return 'active';
+  return M.historyOf(a.id, tid).length ? 'pending' : 'disabled';
+}
+
+function renderDashboard() {
+  const state = document.body.dataset.state;
+  $('#run-id').textContent = M.run.id.slice(0, 8);
+  $('#run-started').textContent = M.run.startedAt;
+  $('#st').textContent = state;
+  $('#counts').textContent = `${M.agents.length}P × ${M.tasks.length}T`;
+  const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+  $('#tasks-count').textContent = `${done}/${M.tasks.length} DONE`;
+  $('#personas-count').textContent = `${M.agents.length} AGENTS`;
+
+  $('#task-rows').innerHTML =
+    M.tasks.map((t, i) => {
+      const scored = M.agents.filter((a) => t.id in a.outcomes).length;
+      const row = `<tr class="click ${openTask === t.id ? 'on' : ''}" data-task="${t.id}" tabindex="0" aria-expanded="${openTask === t.id}"><td class="n">${pad(i + 1)}</td><td class="name">${esc(t.name)}</td><td>${badge(M.taskStatus(t.id))}</td><td class="r num">${scored}/${M.agents.length}</td></tr>`;
+      return row + (openTask === t.id ? detailRow(t) : '');
+    }).join('') +
+    `<tr class="only-ev"><td class="n">··</td><td colspan="3"><i class="spin"></i><b>EVALUATING</b> <span class="mono">— scoring final transcripts</span></td></tr>` +
+    `<tr class="only-co click" data-open-change tabindex="0"><td class="n">→</td><td colspan="3">See suggestions (${M.suggestions.length})</td></tr>`;
+
+  $('#task-rows').querySelectorAll('tr[data-task]').forEach((r) => {
+    const go = () => { openTask = openTask === r.dataset.task ? null : r.dataset.task; renderDashboard(); };
+    r.addEventListener('click', go);
+    onKey(r, go);
+  });
+  const oc = $('[data-open-change]');
+  const goChange = () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id });
+  oc.addEventListener('click', goChange);
+  onKey(oc, goChange);
+  $('#task-rows').querySelectorAll('[data-open-agent]').forEach((b) =>
+    b.addEventListener('click', (e) => { e.stopPropagation(); openAgent(b.dataset.openAgent, b.dataset.t); }));
+
+  $('#persona-rows').innerHTML = M.agents.map((a) => {
+    const p = M.personaOf(a);
+    const task = M.taskById[a.currentTaskId];
+    const cur = state === 'completed' ? 'done' : a.status === 'error' ? 'error' : `<i class="spin"></i>${esc(task ? task.short : '—')}`;
+    const stt = state === 'completed' ? 'done' : a.status === 'working' ? 'active' : a.status;
+    return `<tr class="click" data-agent="${a.id}" tabindex="0" role="button"><td class="ini"><span class="init">${esc(p.name[0])}</span></td><td class="name">${esc(p.name)}</td><td class="num">${p.age}</td><td>${cur}</td><td class="r num p">${a.passed}</td><td class="r num f">${a.failed + a.errored}</td><td>${badge(stt)}</td></tr>`;
+  }).join('');
+  $('#persona-rows').querySelectorAll('[data-agent]').forEach((r) => {
+    const go = () => openAgent(r.dataset.agent, null);
+    r.addEventListener('click', go);
+    onKey(r, go);
+  });
+}
+
+function detailRow(t) {
+  const rows = M.agents.map((a) => {
+    const p = M.personaOf(a);
+    const st = agentState(a, t.id);
+    const n = M.historyOf(a.id, t.id).length;
+    const ok = st !== 'pending' && st !== 'disabled';
+    return `<tr><td>${esc(p.name)}</td><td>${badge(st)}</td><td class="num">${n}</td><td class="r"><button class="open" data-open-agent="${a.id}" data-t="${t.id}" ${ok ? '' : 'disabled'}>${st === 'active' ? 'LIVE' : 'OPEN'} →</button></td></tr>`;
+  }).join('');
+  return `<tr class="detail"><td colspan="4"><div class="det">
+    <div><blockquote>${esc(t.description)}</blockquote>
+      <dl class="kv"><dt>Brief</dt><dd>${esc(t.name)}</dd><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Predicate</dt><dd><pre class="code">${esc(t.success)}</pre></dd><dt>Max steps</dt><dd class="num">${t.maxSteps}</dd></dl></div>
+    <div><table><thead><tr><th>Persona</th><th>Outcome</th><th>Steps</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+  </div></td></tr>`;
+}
+
+function openAgent(agentId, taskId) {
+  const a = M.agentById[agentId];
+  if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+  if (document.body.dataset.state === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId))
+    return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+  const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+  openSandbox({ kind: 'replay', agentId, taskId: target });
+}
+
+function openSandbox(mode) {
+  sb = mode;
+  after = false;
+  clearInterval(replay.timer);
+  replay = { cursor: 0, playing: true, timer: null };
+  $('#sandbox').hidden = false;
+  $('#dashboard').style.display = 'none';
+  renderSandbox();
+  if (mode.kind === 'replay') startReplay();
+}
+function closeSandbox() {
+  clearInterval(replay.timer);
+  sb = null;
+  $('#sandbox').hidden = true;
+  $('#dashboard').style.display = '';
+}
+$('#sb-back').addEventListener('click', closeSandbox);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sb) closeSandbox(); });
+
+const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+
+function renderSandbox() {
+  const left = $('#sb-left');
+  const right = $('#sb-right');
+  const steps = stepsFor();
+  $('#transport').hidden = sb.kind !== 'replay';
+  $('#viewport').className = 'viewport';
+  $('#stage').dataset.screen = '';
+
+  if (sb.kind === 'change') {
+    const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+    const si = M.suggestions.indexOf(s);
+    $('#sb-title').textContent = 'Proposed change ' + pad(si + 1);
+    $('#sb-kind').textContent = 'CHANGE';
+    $('#vcap').textContent = 'VIEWPORT / ORBIT / BEFORE';
+    $('#stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+    injectFx();
+    left.innerHTML = `
+      <div class="blk err"><div class="lab">Erratum <small>${pad(si + 1)}/${pad(M.suggestions.length)}</small></div>
+        <span class="tag ${s.category}">${s.category}</span>
+        <h3>${esc(s.title)}</h3>
+        <p>${esc(s.rationale)}</p>
+        <div class="ba"><button class="on" data-after="0">Before</button><button data-after="1">After</button></div>
+        <pre class="code">${esc(s.change.type)}\n${Object.entries(s.change.params).map(([k, v]) => `  ${esc(k)} = ${esc(v)}`).join('\n')}</pre>
+      </div>
+      <div class="blk"><div class="lab">Evidence <small>${s.evidence.length}</small></div>
+        <table class="mini"><thead><tr><th>Persona</th><th>Task</th><th>§</th></tr></thead><tbody>${s.evidence
+          .map((e) => `<tr class="click" data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}" tabindex="0"><td>${esc(M.personaOf(M.agentById[e.agentId]).name)}</td><td>${esc(M.taskById[e.taskId].short)}</td><td class="num">§${e.step}</td></tr>`)
+          .join('')}</tbody></table>
+      </div>`;
+    left.querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(s, b.dataset.after === '1')));
+    left.querySelectorAll('[data-ev-agent]').forEach((r) => {
+      const go = () => openSandbox({ kind: 'replay', agentId: r.dataset.evAgent, taskId: r.dataset.evTask });
+      r.addEventListener('click', go);
+      onKey(r, go);
+    });
+    right.innerHTML = `<div class="blk"><div class="lab">Fixes <small>${M.suggestions.length}</small></div>
+      <ol class="list">${M.suggestions
+        .map((x, i) => `<li><button class="${x.id === s.id ? 'on' : ''}" data-sug="${x.id}" style="grid-template-columns:36px 1fr"><span class="ix">${pad(i + 1)}</span><span>${esc(x.title)}<br><span class="tag ${x.category}" style="margin-top:6px">${x.category}</span></span></button></li>`)
+        .join('')}</ol></div>`;
+    right.querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => { sb.suggestionId = b.dataset.sug; after = false; renderSandbox(); }));
+    setTimeout(() => { if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) setAfter(s, true); }, 900);
+    return;
+  }
+
+  const a = M.agentById[sb.agentId];
+  const p = M.personaOf(a);
+  const t = M.taskById[sb.taskId];
+  const outcome = a.outcomes[sb.taskId];
+  $('#sb-title').textContent = t ? t.name : '';
+  $('#sb-kind').textContent = sb.kind === 'live' ? '● LIVE' : 'REPLAY';
+  $('#vcap').textContent = 'VIEWPORT / ORBIT';
+  left.innerHTML = `
+    <div class="blk"><div class="lab">Persona</div>
+      <div class="who"><span class="init">${esc(p.name[0])}</span><div><h3>${esc(p.name)}</h3><span class="mono">${p.age} / ${esc(p.gender)}</span></div><span class="badge ${a.status === 'working' ? 'active' : a.status}" style="margin-left:auto">${esc(a.status)}</span></div>
+      <div class="chips">${p.modifiers.length ? p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('') : '<span class="chip">no modifiers</span>'}</div>
+    </div>
+    <div class="blk" id="step-note"></div>
+    ${outcome === 'failed' || outcome === 'errored' ? `<div class="blk fail"><div class="lab">${outcome === 'errored' ? 'Error' : 'Fail'}</div><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>` : ''}`;
+  renderStep();
+
+  right.innerHTML = `<div class="blk"><div class="lab">Tasks <small>${Object.keys(a.outcomes).length}/${M.tasks.length}</small></div>
+    <ol class="list">${M.tasks
+      .map((x, i) => {
+        const o = a.outcomes[x.id];
+        const live = a.currentTaskId === x.id && !o;
+        const has = M.historyOf(a.id, x.id).length > 0;
+        return `<li><button class="${x.id === sb.taskId ? 'on' : ''}" data-task="${x.id}" data-live="${live ? 1 : 0}" ${has ? '' : 'disabled'}><span class="ix">${pad(i + 1)}</span><span>${esc(x.short)}</span>${g(o || (live ? 'active' : 'pending'))}</button></li>`;
+      })
+      .join('')}</ol></div>`;
+  right.querySelectorAll('[data-task]').forEach((b) =>
+    b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.task })));
+
+  if (sb.kind === 'replay') {
+    $('#scrub').max = steps.length;
+    $('#steps').innerHTML = steps.map((s, i) => `<li><button data-i="${i}"><b>${pad(i + 1)}</b>${esc(s.action)}</button></li>`).join('');
+    $('#steps').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+    renderTransport();
+  }
+}
+
+function setAfter(s, v) {
+  after = v;
+  $('#sb-left').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+  $('#vcap').textContent = 'VIEWPORT / ORBIT / ' + (v ? 'AFTER' : 'BEFORE');
+  $('#viewport').className = 'viewport' + (v ? ' after-' + s.change.type : '');
+}
+
+function screenFor(cursor, steps, t) {
+  if (!steps.length) return 'home';
+  if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+  const seen = steps.slice(0, cursor).map((s) => s.action);
+  if (t && t.id === 't-basal' && seen.includes('press select')) return 'basal';
+  if (seen.some((x) => x.startsWith('hold up') || x === 'press up')) return 'bolus';
+  if (seen.includes('press select')) return 'home';
+  return t && t.id === 't-alarm' ? 'alarm' : 'home';
+}
+
+function renderStep() {
+  const steps = stepsFor();
+  const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+  const cur = steps[shown - 1];
+  const t = M.taskById[sb.taskId];
+  const a = M.agentById[sb.agentId];
+  const scr = screenFor(shown, steps, t);
+  $('#step-note').innerHTML = `
+    <div class="lab">Step <small>${sb.kind === 'replay' ? `${pad(shown)} OF ${pad(steps.length)}` : pad(shown)} · ${esc(t ? t.short : '')}</small></div>
+    <div class="action">${cur ? esc(cur.action) : 'waiting'}</div>
+    ${cur && cur.reasoning ? `<p class="reason">“${esc(cur.reasoning)}”</p>` : ''}
+    ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: scr })}<figcaption>FRAME ${pad(shown)} — heard confirmation beep</figcaption></figure>` : ''}`;
+  const pressed = cur && cur.action.match(/^(press|hold) (\w+)/);
+  const stage = $('#stage');
+  if (stage.dataset.screen !== scr) {
+    stage.dataset.screen = scr;
+    stage.innerHTML = M.pumpSvg({ screen: scr });
+  }
+  stage.querySelectorAll('.key').forEach((k) => k.classList.toggle('pressed', !!pressed && k.dataset.button === pressed[2]));
+}
+
+function startReplay() {
+  clearInterval(replay.timer);
+  replay.timer = setInterval(() => {
+    if (!replay.playing) return;
+    if (replay.cursor >= stepsFor().length) {
+      replay.playing = false;
+      renderTransport();
+      return;
+    }
+    replay.cursor += 1;
+    renderStep();
+    renderTransport();
+  }, 1100);
+}
+function scrub(n) {
+  replay.playing = false;
+  replay.cursor = n;
+  renderStep();
+  renderTransport();
+}
+function renderTransport() {
+  const n = stepsFor().length;
+  $('#scrub').value = replay.cursor;
+  $('#scrub-n').textContent = `${pad(replay.cursor)}/${pad(n)}`;
+  const ended = replay.cursor >= n;
+  $('#play').textContent = replay.playing && !ended ? 'PAUSE' : ended ? 'REPLAY' : 'PLAY';
+  $('#steps').querySelectorAll('button').forEach((b, i) => {
+    b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+    if (i === replay.cursor) b.scrollIntoView({ block: 'nearest', inline: 'center' });
+  });
+}
+$('#play').addEventListener('click', () => {
+  if (replay.cursor >= stepsFor().length) {
+    replay.cursor = 0;
+    replay.playing = true;
+    renderStep();
+  } else replay.playing = !replay.playing;
+  renderTransport();
+});
+$('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+function injectFx() {
+  $('#stage svg').insertAdjacentHTML(
+    'beforeend',
+    `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" fill="#0b1118" stroke="#ffe600" stroke-width="2"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffe600" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+      `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" fill="#ffe600"/><text x="137" y="48" text-anchor="middle" font-size="8" font-weight="700" fill="#000" font-family="monospace">90 s</text></g>` +
+      `<g class="fx fx-audio" fill="none" stroke="#ffe600" stroke-width="2"><rect x="13" y="13" width="18" height="18"/><rect x="7" y="7" width="30" height="30" opacity=".6"/><rect x="1" y="1" width="42" height="42" opacity=".3"/></g>`,
+  );
+}
+
+(function orbit() {
+  const vp = $('#viewport');
+  const stage = $('#stage');
+  const sh = $('.shadow');
+  let drag = null;
+  let rx = -8;
+  let ry = 18;
+  let z = 1;
+  const apply = () => {
+    stage.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`;
+    // Shadow narrows as the pump turns edge-on, which sells the depth.
+    sh.style.transform = `scaleX(${(z * (1 - Math.abs(Math.sin((ry * Math.PI) / 180)) * 0.4)).toFixed(3)})`;
+  };
+  apply();
+  vp.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, rx, ry };
+    vp.classList.add('dragging');
+    stage.style.transition = 'none';
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    ry = drag.ry + (e.clientX - drag.x) * 0.4;
+    rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+    apply();
+  });
+  window.addEventListener('pointerup', () => {
+    drag = null;
+    vp.classList.remove('dragging');
+    stage.style.transition = '';
+  });
+  vp.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+    apply();
+  }, { passive: false });
+})();
+
+document.addEventListener('mock:state', renderDashboard);
+document.addEventListener('mock:open', (e) => {
+  const k = e.detail.kind;
+  if (k === 'dashboard') return closeSandbox();
+  if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+  openSandbox({ kind: k, ...M.defaults[k] });
+});
+
+renderDashboard();
+M.mountControls();
+</script>
+</body>
+</html>

@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Infallible Tabs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* 15 Tabs: one calm page per tab (Overview, Tasks, Personas, Suggestions, Viewer) on a 12-column grid. */
+      :root {
+        --page: #fafafa;
+        --card: #fff;
+        --ink: #17181b;
+        --muted: #6b6f76;
+        --faint: #9a9ea5;
+        --line: rgba(0, 0, 0, 0.1);
+        --hover: #f4f4f6;
+        --accent: #4f46e5;
+        --accent-soft: #eef0fe;
+        --ok: #16a34a;
+        --bad: #dc2626;
+        --r: 8px;
+        --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--page);
+        color: var(--ink);
+        font: 14px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-variant-numeric: tabular-nums;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+      h1, h2, h3, p, ul, ol, figure, blockquote { margin: 0; padding: 0; }
+      ul, ol { list-style: none; }
+      .eyebrow { font-size: 12px; color: var(--muted); font-weight: 500; }
+      .muted { color: var(--muted); }
+      .num { text-align: right; font-variant-numeric: tabular-nums; }
+      code, .mono { font-family: var(--mono); font-size: 13px; }
+
+      /* header */
+      header.app { padding: 24px 40px 0; background: var(--card); border-bottom: 1px solid var(--line); }
+      .head-row { display: flex; align-items: baseline; gap: 24px; }
+      .head-row h1 { font-size: 20px; font-weight: 600; }
+      .head-meta { display: flex; gap: 24px; color: var(--muted); }
+      .head-meta b { color: var(--ink); font-weight: 500; }
+      .state { display: inline-flex; align-items: center; gap: 8px; }
+      .head-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+      .tabs { display: flex; gap: 0; margin-top: 16px; }
+      .tab { position: relative; padding: 8px 16px 12px; color: var(--muted); font-weight: 500; display: inline-flex; gap: 8px; align-items: center; transition: color 0.15s; }
+      .tab:hover:not(:disabled) { color: var(--ink); }
+      .tab[aria-selected='true'] { color: var(--ink); }
+      .tab[aria-selected='true']::after { content: ''; position: absolute; left: 16px; right: 16px; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; }
+      .tab:disabled { color: var(--faint); }
+      .tab .badge { font-size: 12px; min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); text-align: center; }
+      .tab:disabled .badge { background: var(--hover); color: var(--faint); }
+      .tab .hint { font-size: 12px; font-weight: 400; color: var(--faint); }
+      .btn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); font-weight: 500; }
+      .btn:hover { background: var(--hover); }
+      .btn.primary { border-color: var(--accent); color: var(--accent); }
+      .btn[hidden] { display: none; }
+
+      /* pages */
+      main { flex: 1; min-height: 0; position: relative; }
+      .page { position: absolute; inset: 0; padding: 32px 40px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto 1fr; gap: 24px 40px; overflow: hidden; animation: fade 0.2s var(--ease); }
+      .page[hidden] { display: none; }
+      @keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 24px; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+      .card.scroll { overflow: auto; }
+      .card-head { display: flex; align-items: baseline; gap: 8px; }
+      .card-head h2 { font-size: 18px; font-weight: 600; }
+      .card-head .num { margin-left: auto; color: var(--muted); }
+      .span-4 { grid-column: span 4; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+      .span-5 { grid-column: span 5; } .span-7 { grid-column: span 7; }
+
+      /* rows: glyph · title · meta */
+      .rows { display: flex; flex-direction: column; margin: 0 -12px; }
+      .row { width: 100%; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 12px; min-height: 40px; padding: 8px 12px; border-radius: var(--r); transition: background 0.15s; }
+      .row:hover:not(:disabled) { background: var(--hover); }
+      .row.on { background: var(--accent-soft); }
+      .row.on .title { color: var(--accent); }
+      .row:disabled { color: var(--faint); }
+      .row .meta { color: var(--muted); text-align: right; white-space: nowrap; display: inline-flex; gap: 16px; align-items: center; }
+      .row .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .rows li + li .row { box-shadow: 0 -1px 0 var(--line); }
+      .rows li + li .row:hover, .rows li + li .row.on, .rows li:has(.row:hover) + li .row, .rows li:has(.row.on) + li .row { box-shadow: none; }
+
+      .glyph { width: 16px; height: 16px; display: inline-block; color: var(--faint); }
+      .glyph svg { display: block; }
+      .glyph.passed, .glyph.done { color: var(--ok); }
+      .glyph.failed, .glyph.errored { color: var(--bad); }
+      .glyph.active { color: var(--accent); }
+      .spin { width: 12px; height: 12px; border: 1.5px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin 0.9s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+      .avatar.lg { width: 40px; height: 40px; font-size: 16px; }
+      .score { display: inline-flex; gap: 12px; }
+      .score .p::before, .score .f::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+      .score .p::before { background: var(--ok); }
+      .score .f::before { background: var(--bad); }
+      .persona-row { grid-template-columns: 24px minmax(160px, 1.4fr) 48px minmax(140px, 1fr) auto; }
+      .cur { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); }
+
+      /* stats */
+      .stats { display: flex; flex-direction: column; }
+      .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+      .stat:last-child { border-bottom: 0; }
+      .stat b { font-size: 28px; font-weight: 500; letter-spacing: -0.01em; }
+      .stat small { color: var(--muted); font-size: 14px; margin-left: 4px; }
+
+      /* detail */
+      .empty { margin: auto; color: var(--faint); text-align: center; }
+      .detail h3 { font-size: 20px; font-weight: 600; line-height: 1.3; }
+      blockquote, q.reason { display: block; border-left: 2px solid var(--line); padding-left: 16px; color: var(--muted); }
+      q.reason::before, q.reason::after { content: ''; }
+      .dl { display: grid; grid-template-columns: 120px 1fr; gap: 8px 24px; }
+      .dl dt { color: var(--muted); }
+      .dl dd { margin: 0; }
+      .dl code { background: var(--hover); padding: 2px 6px; border-radius: 4px; }
+      .who { display: flex; gap: 16px; align-items: center; }
+      .who h3 { font-size: 18px; font-weight: 600; }
+      .pill { margin-left: auto; font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+      .chip { font-size: 12px; padding: 2px 8px; border-radius: var(--r); background: var(--hover); color: var(--muted); }
+      .tag { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+      .tag::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+      .tag.hardware::before { background: #b45309; }
+      .tag.firmware::before { background: var(--accent); }
+      .tag.interaction::before { background: #0e7490; }
+      .seg { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: var(--r); background: var(--page); align-self: flex-start; }
+      .seg button { padding: 4px 16px; border-radius: 6px; color: var(--muted); font-weight: 500; transition: background 0.15s, color 0.15s; }
+      .seg button.on { background: var(--card); color: var(--accent); box-shadow: 0 0 0 1px var(--line); }
+      .sec { display: flex; flex-direction: column; gap: 8px; }
+
+      /* viewport */
+      .viewport { position: relative; background: #f1f1f3; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; cursor: grab; display: grid; place-items: center; min-height: 0; }
+      .viewport.dragging { cursor: grabbing; }
+      .viewport::after { content: ''; position: absolute; left: 50%; bottom: 9%; width: 30%; height: 18px; transform: translateX(-50%); background: radial-gradient(closest-side, rgba(0, 0, 0, 0.16), transparent); pointer-events: none; }
+      .stage { height: 78%; aspect-ratio: 180 / 320; transition: transform 0.3s var(--ease); position: relative; z-index: 1; }
+      .stage svg { width: 100%; height: 100%; display: block; }
+      .stage .key, .stage .screen text, .stage .fx { transition: transform 0.3s var(--ease), opacity 0.3s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .stage .fx { opacity: 0; }
+      .stage .key.pressed rect { fill: #6366f1; }
+      .viewport.after-move_button .key-select { transform: translateY(16px); }
+      .viewport.after-resize_text .screen text { transform: scale(1.5); }
+      .viewport.after-confirm_dialog .fx-dialog, .viewport.after-change_timeout .fx-timeout, .viewport.after-add_audio_cue .fx-audio { opacity: 1; }
+      .vp-cap { position: absolute; left: 16px; bottom: 12px; font-size: 12px; color: var(--faint); z-index: 2; }
+      .vp-tag { position: absolute; left: 16px; top: 12px; font-size: 12px; color: var(--muted); z-index: 2; display: inline-flex; gap: 8px; align-items: center; }
+
+      /* viewer */
+      .viewer-main { grid-column: span 8; display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+      .viewer-main .viewport { flex: 1; }
+      .viewer-side { grid-column: span 4; display: flex; flex-direction: column; gap: 16px; overflow: auto; min-height: 0; }
+      .viewer-side .card { padding: 16px 24px; }
+      .vhead { grid-column: span 12; display: flex; align-items: center; gap: 16px; }
+      .vhead h2 { font-size: 18px; font-weight: 600; }
+      .action { font-size: 22px; font-weight: 600; line-height: 1.3; animation: fade 0.2s var(--ease); }
+      .frame { border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); }
+      .frame svg { display: block; width: 100%; }
+      .frame figcaption { font-size: 12px; color: var(--muted); padding: 8px 12px; }
+      .failure { border-left: 2px solid var(--bad); }
+      .transport { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 8px 0 8px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); }
+      .transport[hidden] { display: none; }
+      .play { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--accent); flex: none; }
+      .play:hover { background: var(--accent-soft); }
+      #scrub { width: 160px; accent-color: var(--accent); flex: none; }
+      .steps { display: flex; gap: 8px; overflow-x: auto; flex: 1; scrollbar-width: none; }
+      .steps button { white-space: nowrap; font-size: 12px; padding: 4px 10px; border-radius: var(--r); border: 1px solid var(--line); color: var(--faint); transition: all 0.15s; }
+      .steps button sup { margin-right: 4px; font-size: 11px; }
+      .steps button.done { color: var(--muted); }
+      .steps button.next { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+      .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+      .small-vp { height: 280px; flex: none; }
+      .small-vp .stage { height: 216px; }
+      .only-evaluating, .only-completed { display: none !important; }
+      body[data-state='evaluating'] .only-evaluating, body[data-state='completed'] .only-completed { display: inline-flex !important; }
+      body[data-state='completed'] .spin { display: none; }
+
+      @media (max-width: 1240px) {
+        .page { gap: 16px 24px; padding: 24px 32px; }
+        header.app { padding: 16px 32px 0; }
+        .persona-row { grid-template-columns: 24px 1fr 40px 1fr auto; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        .spin { animation: spin 1.5s linear infinite !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <header class="app">
+      <div class="head-row">
+        <h1>Infallible</h1>
+        <div class="head-meta">
+          <span>Run <b class="mono" id="run-id"></b></span>
+          <span class="state"><span class="spin only-running" id="state-spin"></span><b id="run-state"></b></span>
+          <span>Started <b id="run-started"></b></span>
+          <span><b id="n-agents"></b> personas · <b id="n-tasks"></b> tasks</span>
+        </div>
+        <div class="head-right">
+          <span class="pill only-evaluating"><span class="spin"></span>Evaluating</span>
+          <button class="btn primary only-completed" id="see-sugs">See suggestions (5)</button>
+          <button class="btn" id="back" hidden>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>Back
+          </button>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist" id="tabs"></nav>
+    </header>
+
+    <main>
+      <section class="page" id="pg-overview" hidden>
+        <div class="card span-4">
+          <div class="card-head"><h2>Run</h2></div>
+          <div class="stats" id="stats"></div>
+        </div>
+        <div class="card span-8 scroll">
+          <div class="card-head"><h2>Tasks</h2><span class="num" id="ov-tasks-n"></span></div>
+          <ul class="rows" id="ov-tasks"></ul>
+        </div>
+        <div class="card span-12 scroll" style="grid-row: 2">
+          <div class="card-head"><h2>Personas</h2><span class="num" id="ov-personas-n"></span></div>
+          <ul class="rows" id="ov-personas"></ul>
+        </div>
+      </section>
+
+      <section class="page" id="pg-tasks" hidden style="grid-template-rows: 1fr">
+        <div class="card span-4 scroll"><div class="card-head"><h2>Tasks</h2><span class="num" id="tk-n"></span></div><ul class="rows" id="tk-list"></ul></div>
+        <div class="card span-8 scroll detail" id="tk-detail"></div>
+      </section>
+
+      <section class="page" id="pg-personas" hidden style="grid-template-rows: 1fr">
+        <div class="card span-4 scroll"><div class="card-head"><h2>Personas</h2><span class="num">5</span></div><ul class="rows" id="pe-list"></ul></div>
+        <div class="card span-8 scroll detail" id="pe-detail"></div>
+      </section>
+
+      <section class="page" id="pg-suggestions" hidden style="grid-template-rows: 1fr">
+        <div class="card span-4 scroll"><div class="card-head"><h2>Suggestions</h2><span class="num">5</span></div><ul class="rows" id="sg-list"></ul></div>
+        <div class="card span-8 scroll detail" id="sg-detail">
+          <div class="sec" id="sg-head"></div>
+          <div class="viewport small-vp" id="sg-vp"><div class="stage" id="sg-stage"></div><span class="vp-cap">Drag to orbit · scroll to zoom</span></div>
+          <div class="sec" id="sg-ev"></div>
+        </div>
+      </section>
+
+      <section class="page" id="pg-viewer" hidden style="grid-template-rows: auto 1fr">
+        <div class="vhead"><span class="eyebrow" id="v-kind"></span><h2 id="v-title"></h2></div>
+        <div class="viewer-main">
+          <div class="viewport" id="viewport"><span class="vp-tag" id="vp-tag"></span><div class="stage" id="stage"></div><span class="vp-cap">Drag to orbit · scroll to zoom</span></div>
+          <div class="transport" id="transport" hidden>
+            <button class="play" id="play" aria-label="Play or pause"><svg width="16" height="16" viewBox="0 0 16 16"><path id="play-icon" d="M5 3.5v9M11 3.5v9" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" /></svg></button>
+            <input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub" />
+            <ol class="steps" id="steps"></ol>
+          </div>
+        </div>
+        <div class="viewer-side" id="v-side"></div>
+      </section>
+    </main>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const ICON = {
+        ok: '<path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+        bad: '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+        active: '<circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="8" cy="8" r="2" fill="currentColor"/>',
+        pending: '<circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-dasharray="2 2"/>',
+      };
+      const glyph = (st) => {
+        const k = st === 'passed' || st === 'done' ? 'ok' : st === 'failed' || st === 'errored' ? 'bad' : st === 'active' ? 'active' : 'pending';
+        return `<span class="glyph ${st}" title="${st}"><svg width="16" height="16" viewBox="0 0 16 16">${ICON[k]}</svg></span>`;
+      };
+      const state = () => document.body.dataset.state;
+      const running = () => state() === 'running';
+      const spin = () => (running() ? '<span class="spin"></span>' : '');
+      const scoreHtml = (a) => `<span class="score"><span class="p">${a.passed}</span><span class="f">${a.failed + a.errored}</span></span>`;
+      const outcomeOf = (a, tid) => a.outcomes[tid] || (a.currentTaskId === tid ? (running() ? 'active' : 'pending') : 'pending');
+
+      let tab = 'overview';
+      let prevTab = 'overview';
+      let selTask = M.tasks[0].id;
+      let selAgent = M.agents[0].id;
+      let selSug = M.suggestions[0].id;
+      let sb = null;
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+      let flipTimer = null;
+      let forceSugs = false;
+
+      /* ---- tabs ---- */
+      const TABS = [
+        ['overview', 'Overview'],
+        ['tasks', 'Tasks'],
+        ['personas', 'Personas'],
+        ['suggestions', 'Suggestions'],
+        ['viewer', 'Viewer'],
+      ];
+      function renderTabs() {
+        const sugOk = state() === 'completed' || forceSugs;
+        $('#tabs').innerHTML = TABS.map(([id, label]) => {
+          let extra = '';
+          let dis = false;
+          if (id === 'suggestions') {
+            extra = `<span class="badge">${M.suggestions.length}</span>`;
+            dis = !sugOk;
+            if (dis) extra += '<span class="hint">after evaluation</span>';
+          }
+          if (id === 'viewer') {
+            dis = !sb;
+            if (dis) extra = '<span class="hint">open a persona or task</span>';
+          }
+          return `<button class="tab" role="tab" data-tab="${id}" aria-selected="${tab === id}" ${dis ? 'disabled' : ''}>${label}${extra}</button>`;
+        }).join('');
+        $('#tabs').querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => go(b.dataset.tab)));
+      }
+      function go(t) {
+        if (t === tab) return;
+        if (tab !== 'viewer') prevTab = tab;
+        if (tab === 'viewer' && t !== 'viewer') clearInterval(replay.timer);
+        if (t === 'viewer' && sb && sb.kind === 'replay') startReplay();
+        tab = t;
+        render();
+      }
+      function back() {
+        if (tab !== 'viewer') return;
+        go(prevTab === 'viewer' ? 'overview' : prevTab);
+      }
+      $('#back').addEventListener('click', back);
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') back();
+      });
+      $('#see-sugs').addEventListener('click', () => openChange(M.suggestions[0].id));
+
+      function render() {
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-started').textContent = M.run.startedAt;
+        $('#run-state').textContent = state()[0].toUpperCase() + state().slice(1);
+        $('#state-spin').style.display = running() ? '' : 'none';
+        $('#n-agents').textContent = M.agents.length;
+        $('#n-tasks').textContent = M.tasks.length;
+        $('#back').hidden = tab !== 'viewer';
+        renderTabs();
+        for (const [id] of TABS) $('#pg-' + id).hidden = id !== tab;
+        if (tab === 'overview') renderOverview();
+        if (tab === 'tasks') renderTasks();
+        if (tab === 'personas') renderPersonas();
+        if (tab === 'suggestions') renderSuggestions();
+        if (tab === 'viewer' && sb) renderViewer();
+      }
+
+      /* ---- shared row builders ---- */
+      const taskRow = (t, on, meta) =>
+        `<li><button class="row ${on ? 'on' : ''}" data-task="${t.id}">${glyph(M.taskStatus(t.id))}<span class="title">${esc(t.name)}</span><span class="meta num">${meta}</span></button></li>`;
+      const scoredN = (t) => M.agents.filter((a) => t.id in a.outcomes).length;
+      const curLabel = (a) => {
+        if (state() === 'completed') return 'done';
+        if (a.status === 'error') return 'error';
+        const t = M.taskById[a.currentTaskId];
+        return `${spin()}${esc(t ? t.short : a.status)}`;
+      };
+      function agentTaskRows(a, onId) {
+        return M.tasks
+          .map((x) => {
+            const st = outcomeOf(a, x.id);
+            const n = M.historyOf(a.id, x.id).length;
+            return `<li><button class="row ${x.id === onId ? 'on' : ''}" data-at="${a.id}|${x.id}" ${n ? '' : 'disabled'}>${glyph(st)}<span class="title">${esc(x.short)}</span><span class="meta num">${n ? n + ' steps' : '—'}</span></button></li>`;
+          })
+          .join('');
+      }
+      function bindAgentTasks(root) {
+        root.querySelectorAll('[data-at]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const [ag, tk] = b.dataset.at.split('|');
+            openAgent(ag, tk);
+          }),
+        );
+      }
+
+      /* ---- overview ---- */
+      function renderOverview() {
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        const passed = M.agents.reduce((n, a) => n + a.passed, 0);
+        const failed = M.agents.reduce((n, a) => n + a.failed + a.errored, 0);
+        const working = running() ? M.agents.filter((a) => a.status === 'working').length : 0;
+        $('#stats').innerHTML = `
+          <div class="stat"><span class="muted">Tasks done</span><span><b>${done}</b><small>/ ${M.tasks.length}</small></span></div>
+          <div class="stat"><span class="muted">Attempts passed / failed</span><span><b>${passed}</b><small>/ ${failed}</small></span></div>
+          <div class="stat"><span class="muted">Personas working</span><span><b>${working}</b><small>/ ${M.agents.length}</small></span></div>
+          <div class="stat"><span class="muted">Started</span><span><b>${M.run.startedAt}</b></span></div>`;
+        $('#ov-tasks-n').textContent = `${done} / ${M.tasks.length} done`;
+        $('#ov-tasks').innerHTML = M.tasks.map((t) => taskRow(t, false, `${scoredN(t)}/${M.agents.length}`)).join('');
+        $('#ov-tasks').querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => {
+            selTask = b.dataset.task;
+            go('tasks');
+          }),
+        );
+        $('#ov-personas-n').textContent = M.agents.length;
+        $('#ov-personas').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            return `<li><button class="row persona-row" data-agent="${a.id}"><span class="avatar">${p.name[0]}</span><span class="title">${esc(p.name)}</span><span class="muted num">${p.age}</span><span class="cur">${curLabel(a)}</span><span class="meta">${scoreHtml(a)}</span></button></li>`;
+          })
+          .join('');
+        $('#ov-personas').querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, null)));
+      }
+
+      /* ---- tasks ---- */
+      function renderTasks() {
+        $('#tk-n').textContent = `${M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length} / ${M.tasks.length}`;
+        $('#tk-list').innerHTML = M.tasks.map((t) => taskRow(t, t.id === selTask, `${scoredN(t)} scored`)).join('');
+        $('#tk-list').querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => {
+            selTask = b.dataset.task;
+            renderTasks();
+          }),
+        );
+        const t = M.taskById[selTask];
+        const i = M.tasks.indexOf(t);
+        $('#tk-detail').innerHTML = `
+          <span class="eyebrow">Task ${i + 1} of ${M.tasks.length}</span>
+          <h3>${esc(t.name)}</h3>
+          <blockquote>${esc(t.description)}</blockquote>
+          <dl class="dl">
+            <dt>Goal</dt><dd>${esc(t.goal)}</dd>
+            <dt>Success</dt><dd><code>${esc(t.success)}</code></dd>
+            <dt>Max steps</dt><dd>${t.maxSteps}</dd>
+          </dl>
+          <div class="sec"><span class="eyebrow">Attempts</span><ul class="rows">${M.agents
+            .map((a) => {
+              const p = M.personaOf(a);
+              const st = outcomeOf(a, t.id);
+              const n = M.historyOf(a.id, t.id).length;
+              return `<li><button class="row" data-agent="${a.id}" ${st === 'pending' ? 'disabled' : ''}>${glyph(st)}<span class="title">${esc(p.name)}</span><span class="meta"><span>${st === 'active' ? 'live' : st}</span><span class="num">${n ? n + ' steps' : '—'}</span></span></button></li>`;
+            })
+            .join('')}</ul></div>`;
+        $('#tk-detail').querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, t.id)));
+      }
+
+      /* ---- personas ---- */
+      function personaCard(a) {
+        const p = M.personaOf(a);
+        return `<div class="who"><span class="avatar lg">${p.name[0]}</span><div><h3>${esc(p.name)}</h3><span class="muted">${p.age}, ${p.gender}</span></div><span class="pill">${running() && a.status === 'working' ? '<span class="spin"></span>' : ''}${esc(state() === 'completed' ? 'done' : a.status)}</span></div>
+          ${p.modifiers.length ? `<div class="chips">${p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('')}</div>` : '<span class="muted">No modifiers</span>'}`;
+      }
+      function renderPersonas() {
+        $('#pe-list').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            return `<li><button class="row ${a.id === selAgent ? 'on' : ''}" data-agent="${a.id}"><span class="avatar">${p.name[0]}</span><span class="title">${esc(p.name)}</span><span class="meta">${scoreHtml(a)}</span></button></li>`;
+          })
+          .join('');
+        $('#pe-list').querySelectorAll('[data-agent]').forEach((b) =>
+          b.addEventListener('click', () => {
+            selAgent = b.dataset.agent;
+            renderPersonas();
+          }),
+        );
+        const a = M.agentById[selAgent];
+        const p = M.personaOf(a);
+        $('#pe-detail').innerHTML = `${personaCard(a)}
+          <blockquote>${esc(p.blurb)}</blockquote>
+          <dl class="dl"><dt>Current</dt><dd class="cur">${curLabel(a)}</dd><dt>Score</dt><dd>${scoreHtml(a)}</dd></dl>
+          <div class="sec"><span class="eyebrow">Tasks</span><ul class="rows">${agentTaskRows(a, null)}</ul></div>
+          <div><button class="btn primary" id="pe-open">Open in viewer</button></div>`;
+        bindAgentTasks($('#pe-detail'));
+        $('#pe-open').addEventListener('click', () => openAgent(a.id, null));
+      }
+
+      /* ---- suggestions (change mode) ---- */
+      function openChange(id) {
+        selSug = id || M.suggestions[0].id;
+        forceSugs = true;
+        after = false;
+        if (tab !== 'suggestions') {
+          if (tab !== 'viewer') prevTab = tab;
+          clearInterval(replay.timer);
+          tab = 'suggestions';
+        }
+        render();
+      }
+      function renderSuggestions() {
+        const s = M.suggestions.find((x) => x.id === selSug);
+        $('#sg-list').innerHTML = M.suggestions
+          .map(
+            (x) =>
+              `<li><button class="row ${x.id === s.id ? 'on' : ''}" data-sug="${x.id}" style="grid-template-columns:1fr auto"><span class="title">${esc(x.title)}</span><span class="meta"><span class="tag ${x.category}">${x.category}</span></span></button></li>`,
+          )
+          .join('');
+        $('#sg-list').querySelectorAll('[data-sug]').forEach((b) =>
+          b.addEventListener('click', () => {
+            selSug = b.dataset.sug;
+            after = false;
+            renderSuggestions();
+          }),
+        );
+        const params = JSON.stringify(s.change.params).replace(/[{}"]/g, '').replace(/,/g, ', ');
+        $('#sg-head').innerHTML = `
+          <span class="tag ${s.category}">${s.category}</span>
+          <h3>${esc(s.title)}</h3>
+          <p class="muted">${esc(s.rationale)}</p>
+          <div style="display:flex;gap:16px;align-items:center;margin-top:8px"><div class="seg"><button data-after="0">Before</button><button data-after="1">After</button></div><code class="muted">${esc(s.change.type)}(${esc(params)})</code></div>`;
+        $('#sg-stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+        injectFx($('#sg-stage svg'));
+        $('#sg-ev').innerHTML = `<span class="eyebrow">Evidence</span><ul class="rows">${s.evidence
+          .map((e) => {
+            const a = M.agentById[e.agentId];
+            return `<li><button class="row" data-ev="${e.agentId}|${e.taskId}">${glyph(a.outcomes[e.taskId] || 'pending')}<span class="title">${esc(M.personaOf(a).name)} · ${esc(M.taskById[e.taskId].short)}</span><span class="meta num">§${e.step}</span></button></li>`;
+          })
+          .join('')}</ul>`;
+        $('#sg-ev').querySelectorAll('[data-ev]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const [ag, tk] = b.dataset.ev.split('|');
+            openSandbox({ kind: 'replay', agentId: ag, taskId: tk });
+          }),
+        );
+        $('#sg-head').querySelectorAll('[data-after]').forEach((b) =>
+          b.addEventListener('click', () => {
+            after = b.dataset.after === '1';
+            applyAfter(s);
+          }),
+        );
+        applyAfter(s);
+        clearTimeout(flipTimer);
+        flipTimer = setTimeout(() => {
+          if (tab === 'suggestions' && selSug === s.id && !after) {
+            after = true;
+            applyAfter(s);
+          }
+        }, 900);
+      }
+      function applyAfter(s) {
+        $('#sg-vp').className = 'viewport small-vp' + (after ? ' after-' + s.change.type : '');
+        $('#sg-head').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === after));
+      }
+      function injectFx(svg) {
+        svg.insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="3" fill="#1b1a17"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#f4f1ea" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#818cf8" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+
+      /* ---- viewer (sandbox) ---- */
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (running() && a.status === 'working' && (!taskId || taskId === a.currentTaskId))
+          return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+        openSandbox({ kind: 'replay', agentId, taskId: target });
+      }
+      function openSandbox(mode) {
+        sb = mode;
+        clearInterval(replay.timer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#stage').dataset.screen = '';
+        if (tab !== 'viewer') prevTab = tab;
+        tab = 'viewer';
+        render();
+        if (mode.kind === 'replay') startReplay();
+      }
+      const stepsFor = () => (sb ? M.historyOf(sb.agentId, sb.taskId) : []);
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((x) => x === 'press select')) return 'basal';
+        if (seen.some((x) => x.startsWith('hold up') || x === 'press up')) return 'bolus';
+        if (seen.some((x) => x === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+      function renderViewer() {
+        const a = M.agentById[sb.agentId];
+        const t = M.taskById[sb.taskId];
+        const steps = stepsFor();
+        const outcome = a.outcomes[sb.taskId];
+        $('#v-kind').innerHTML = sb.kind === 'live' ? '<span class="live-dot" style="display:inline-block;margin-right:8px"></span>Live' : 'Replay';
+        $('#v-title').textContent = `${M.personaOf(a).name} · ${t.name}`;
+        $('#vp-tag').innerHTML = outcome ? `${glyph(outcome)}${outcome}` : sb.kind === 'live' ? `${spin()}working` : '';
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#v-side').innerHTML = `
+          <div class="card">${personaCard(a)}</div>
+          <div class="card" id="step-card"></div>
+          ${outcome === 'failed' || outcome === 'errored' ? `<div class="card failure"><span class="eyebrow">${outcome === 'errored' ? 'Errored' : 'Failed'}</span><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>` : ''}
+          <div class="card"><div class="card-head"><h2>Tasks</h2><span class="num">${Object.keys(a.outcomes).length} / ${M.tasks.length}</span></div><ul class="rows">${agentTaskRows(a, sb.taskId)}</ul></div>`;
+        bindAgentTasks($('#v-side'));
+        renderStep();
+        if (sb.kind === 'replay') {
+          $('#scrub').max = steps.length;
+          $('#steps').innerHTML = steps.map((s, i) => `<li><button data-i="${i}"><sup>${i + 1}</sup>${esc(s.action)}</button></li>`).join('');
+          $('#steps').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+          renderTransport();
+        }
+      }
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const scr = screenFor(shown, steps, t);
+        $('#step-card').innerHTML = `
+          <span class="eyebrow">${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${esc(t.short)}</span>
+          <div class="action">${cur ? esc(cur.action) : 'Ready'}</div>
+          ${cur && cur.reasoning ? `<q class="reason">${esc(cur.reasoning)}</q>` : ''}
+          ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: scr })}<figcaption>heard confirmation beep (4 kHz, 80 ms)</figcaption></figure>` : ''}`;
+        const stage = $('#stage');
+        const pressed = cur && cur.action.match(/^(press|hold) (\w+)/);
+        if (stage.dataset.screen !== scr || !stage.firstChild) {
+          stage.dataset.screen = scr;
+          stage.innerHTML = M.pumpSvg({ screen: scr });
+        }
+        stage.querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', !!pressed && k.dataset.button === pressed[2]));
+      }
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing || !sb || sb.kind !== 'replay') return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            renderTransport();
+            return;
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const ended = replay.cursor >= n;
+        const playing = replay.playing && !ended;
+        $('#scrub').value = replay.cursor;
+        $('#play-icon').setAttribute('d', playing ? 'M5 3.5v9M11 3.5v9' : 'M5 3.5v9l7-4.5z');
+        $('#play-icon').setAttribute('fill', playing ? 'none' : 'currentColor');
+        $('#play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+        $('#steps').querySelectorAll('button').forEach((b, i) => {
+          b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+          if (i === replay.cursor) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+        });
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      });
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      /* cosmetic orbit */
+      function orbit(vp, stage) {
+        let drag = null;
+        let rx = -6;
+        let ry = 14;
+        let z = 1;
+        const apply = () => (stage.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => {
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          stage.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          if (!drag) return;
+          drag = null;
+          vp.classList.remove('dragging');
+          stage.style.transition = '';
+        });
+        vp.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+          apply();
+        }, { passive: false });
+      }
+      orbit($('#viewport'), $('#stage'));
+      orbit($('#sg-vp'), $('#sg-stage'));
+
+      /* mock controls */
+      document.addEventListener('mock:state', () => {
+        if (state() !== 'completed') forceSugs = false;
+        if (tab === 'suggestions' && state() !== 'completed') go('overview');
+        else render();
+      });
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') {
+          clearInterval(replay.timer);
+          tab = 'overview';
+          return render();
+        }
+        if (k === 'change') return openChange(M.defaults.change.suggestionId);
+        openSandbox({ kind: k, ...M.defaults[k] });
+      });
+
+      render();
+      M.mountControls();
+    </script>
+  </body>
+</html>

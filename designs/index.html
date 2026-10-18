@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Infallible · design explorations</title>
+    <style>
+      :root {
+        --bg: #f3f2ee;
+        --fg: #16150f;
+        --muted: #6f6c62;
+        --line: rgba(22, 21, 15, 0.12);
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      header {
+        padding: 44px 48px 24px;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 560px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 28px;
+        padding: 0 48px 56px;
+      }
+      h2 {
+        margin: 0;
+        padding: 8px 48px 20px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      h2 span {
+        color: var(--muted);
+        font-weight: 400;
+        margin-left: 10px;
+      }
+      .card {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        background: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow:
+          0 1px 2px rgba(22, 21, 15, 0.05),
+          0 10px 30px -16px rgba(22, 21, 15, 0.25);
+        transition:
+          transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+          box-shadow 0.25s;
+      }
+      .card:hover {
+        transform: translateY(-3px);
+        box-shadow:
+          0 2px 4px rgba(22, 21, 15, 0.06),
+          0 24px 40px -18px rgba(22, 21, 15, 0.35);
+      }
+      .thumb {
+        display: block;
+        position: relative;
+        aspect-ratio: 16 / 10;
+        overflow: hidden;
+        background: #e9e8e3;
+        border-bottom: 1px solid var(--line);
+      }
+      .thumb iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 1440px;
+        height: 900px;
+        border: 0;
+        transform-origin: 0 0;
+        pointer-events: none;
+      }
+      .meta {
+        padding: 14px 16px 16px;
+      }
+      .meta b {
+        display: block;
+        font-weight: 600;
+      }
+      .meta b a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .meta b a:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .meta b small {
+        color: var(--muted);
+        font-weight: 500;
+        margin-right: 8px;
+        font-variant-numeric: tabular-nums;
+      }
+      .meta span {
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .links {
+        margin-top: 10px;
+        display: flex;
+        gap: 6px;
+      }
+      .links a {
+        font-size: 12px;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+      }
+      .links a:hover {
+        color: var(--fg);
+        border-color: var(--fg);
+      }
+      footer {
+        padding: 0 48px 48px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      code {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Infallible · design explorations</h1>
+      <p>
+        Static mockups of the sim dashboard and sandbox. Same dummy run, twenty directions. Each page has a
+        small <code>mock</code> widget bottom-right to switch run state and jump between screens, and
+        accepts <code>#replay</code>, <code>#live</code>, <code>#change,completed</code> in the URL.
+      </p>
+    </header>
+    <h2>Round 2 <span>calm and organized: one structure each, light, hairlines, one accent</span></h2>
+    <div class="grid" id="grid-2"></div>
+    <h2>Round 1 <span>the first ten directions</span></h2>
+    <div class="grid" id="grid-1"></div>
+    <footer>Data and SVG stand-ins live in <code>_shared/mock.js</code>. Nothing here talks to the driver.</footer>
+    <script>
+      const round2 = [
+        ['11-folio', 'Folio', 'A table of contents beside one numbered document; the sandbox is a figure page.'],
+        ['12-columns', 'Columns', 'Finder-style column browser; selection flows left to right into the viewport.'],
+        ['13-outline', 'Outline', 'An outliner: tasks ▸ attempts ▸ steps, with a fixed detail pane.'],
+        ['14-register', 'Register', 'One sortable table of all 25 attempts; details and the sandbox in a drawer.'],
+        ['15-tabs', 'Tabs', 'Overview · Tasks · Personas · Suggestions · Viewer, one simple page per tab.'],
+        ['16-deck', 'Deck', 'One idea per screen, like slides, with a bottom rail and arrow keys.'],
+        ['17-drafting', 'Drafting', 'A technical drawing sheet with a title block, parts list and revision table.'],
+        ['18-protocol', 'Protocol', 'A vertical stepper of tasks with a per-persona checklist; participants beside it.'],
+        ['19-studio', 'Studio', 'A light design tool: layers, canvas, inspector; floating panels, no chrome.'],
+        ['20-catalog', 'Catalog', 'Two rows of identical cards that expand a detail panel in place.'],
+      ];
+      const designs = [
+        ['01-ledger', 'Ledger', 'The run as a printed report that fills in live. Paper, hairlines, serif, margin notes.'],
+        ['02-console', 'Console', 'Dark mission control. Monospace lanes per persona, bracketed HUD, telemetry tape.'],
+        ['03-matrix', 'Matrix', 'Personas × tasks as a grid. Swiss, one signal colour, filmstrip replay.'],
+        ['04-workbench', 'Workbench', 'IDE chrome: navigator tree, always-on viewport, inspector tabs, status bar.'],
+        ['05-board', 'Board', 'Kanban of persona × task cards; sandbox as a bottom sheet.'],
+        ['06-clinical', 'Clinical', 'Medical-device language: labelled fields, IEC alert colours, audit trail.'],
+        ['07-theater', 'Theater', 'One persona on stage at a time, huge type, rotating spotlight, drawers.'],
+        ['08-brutalist', 'Brutalist', 'Raw tables, 2px borders, safety yellow, numbered step boxes.'],
+        ['09-tiles', 'Tiles', 'A wall of live pump tiles on navy glass; a tile zooms into the sandbox.'],
+        ['10-journal', 'Journal', 'Lab-notebook feed with handwritten reasoning; sandbox as a modal exhibit.'],
+      ];
+      const card = ([file, name, idea]) => `
+          <div class="card">
+            <a class="thumb" href="${file}.html" aria-label="Open ${name}"><iframe src="${file}.html" loading="lazy" tabindex="-1" title="${name}"></iframe></a>
+            <div class="meta">
+              <b><small>${file.slice(0, 2)}</small><a href="${file}.html">${name}</a></b>
+              <span>${idea}</span>
+              <div class="links">
+                <a href="${file}.html#dashboard">dashboard</a>
+                <a href="${file}.html#live">live</a>
+                <a href="${file}.html#replay">replay</a>
+                <a href="${file}.html#change,completed">suggestions</a>
+              </div>
+            </div>
+          </div>`;
+      document.getElementById('grid-2').innerHTML = round2.map(card).join('');
+      document.getElementById('grid-1').innerHTML = designs.map(card).join('');
+      const fit = () => {
+        document.querySelectorAll('.thumb').forEach((t) => {
+          const f = t.querySelector('iframe');
+          f.style.transform = `scale(${t.clientWidth / 1440})`;
+        });
+      };
+      fit();
+      addEventListener('resize', fit);
+    </script>
+  </body>
+</html>

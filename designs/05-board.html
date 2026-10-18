@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Board · Infallible design 05</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      /* 05 · Board — the run as a friendly kanban: one soft card per persona × task, sliding sandbox sheet. */
+      :root {
+        --bg: #f6f7f9;
+        --card: #ffffff;
+        --ink: #1f2430;
+        --ink-2: #5b6272;
+        --ink-3: #9aa1af;
+        --line: #e6e8ee;
+        --blue: #4a6cf7;
+        --green: #22a06b;
+        --red: #e5484d;
+        --amber: #e39b17;
+        --violet: #8b5cf6;
+        --t-queued: #eef0f4;
+        --t-progress: #eaf0ff;
+        --t-passed: #e8f6ef;
+        --t-failed: #fdeeee;
+        --t-sugg: #f3edff;
+        --shadow: 0 1px 2px rgba(31, 36, 48, 0.05), 0 4px 14px rgba(31, 36, 48, 0.06);
+        --shadow-lift: 0 2px 4px rgba(31, 36, 48, 0.06), 0 14px 30px rgba(31, 36, 48, 0.12);
+        --r: 14px;
+        --sans: 'Manrope', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 14px/1.45 var(--sans);
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, p, ul, ol { margin: 0; }
+      ul, ol { padding: 0; list-style: none; }
+      button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+      button:disabled { cursor: default; }
+      :focus-visible { outline: 2.5px solid var(--blue); outline-offset: 2px; border-radius: 10px; }
+      code { font-family: var(--mono); font-size: 12px; }
+      .num { font-variant-numeric: tabular-nums; }
+      .muted { color: var(--ink-2); }
+
+      /* ---- top bar ---- */
+      #dashboard { height: 100%; display: flex; flex-direction: column; }
+      .topbar {
+        display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+        padding: 14px 24px; background: var(--card); border-bottom: 1px solid var(--line);
+      }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+      .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #6d8bff, #a78bfa); display: grid; place-items: center; color: #fff; font-size: 15px; }
+      .runpill { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 999px; background: var(--bg); font-size: 12.5px; color: var(--ink-2); }
+      .runpill code { color: var(--ink); }
+      .state { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--ink); text-transform: capitalize; }
+      .state i { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); animation: pulse 1.6s var(--ease) infinite; }
+      body[data-state='evaluating'] .state i { background: var(--amber); }
+      body[data-state='completed'] .state i { background: var(--green); animation: none; }
+      .group { display: flex; align-items: center; gap: 10px; }
+      .group .lbl { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+      .dots { display: flex; gap: 8px; position: relative; }
+      .dot {
+        width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+        font-size: 11px; font-weight: 800; background: var(--t-queued); color: var(--ink-3);
+        transition: transform 0.25s var(--spring), box-shadow 0.25s;
+      }
+      .dot:hover { transform: scale(1.12); }
+      .dot.done { background: var(--green); color: #fff; }
+      .dot.active { background: var(--t-progress); color: var(--blue); box-shadow: inset 0 0 0 2px var(--blue); }
+      .dot.on { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--ink); }
+      .spacer { flex: 1; }
+      .filters { display: flex; gap: 6px; }
+      .pchip { display: flex; align-items: center; border-radius: 999px; background: var(--bg); transition: background 0.2s, opacity 0.2s, box-shadow 0.2s; }
+      .pchip .tog { display: flex; align-items: center; gap: 8px; padding: 3px 10px 3px 3px; border-radius: 999px; }
+      .pchip .open { padding: 0 10px 0 4px; height: 32px; color: var(--ink-3); font-size: 15px; border-radius: 999px; }
+      .pchip .open:hover { color: var(--blue); }
+      .pchip .meta { display: flex; flex-direction: column; line-height: 1.15; font-size: 11px; color: var(--ink-2); max-width: 118px; }
+      .pchip .meta b { font-size: 12px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pchip .meta span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pchip .score { font-size: 11px; font-weight: 700; }
+      .pchip .score .p { color: var(--green); }
+      .pchip .score .f { color: var(--red); }
+      .pchip.on { background: #fff; box-shadow: 0 0 0 2px var(--blue); }
+      .filters.filtering .pchip:not(.on) { opacity: 0.45; }
+      .av { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; flex-shrink: 0; font-weight: 800; font-size: 12px; color: #fff; }
+      .av.lg { width: 44px; height: 44px; font-size: 17px; }
+      .spin { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--blue); border-right-color: transparent; animation: spin 0.8s linear infinite; vertical-align: -1px; margin-right: 4px; }
+      body:not([data-state='running']) .spin { display: none; }
+      .eval-chip, .sugg-btn { display: none; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; }
+      .eval-chip { background: #fff4de; color: #9a6206; }
+      body[data-state='evaluating'] .eval-chip .spin { display: inline-block; border-color: var(--amber); border-right-color: transparent; }
+      body[data-state='evaluating'] .eval-chip { display: inline-flex; }
+      .sugg-btn { background: var(--violet); color: #fff; box-shadow: 0 6px 16px rgba(139, 92, 246, 0.35); transition: transform 0.2s var(--spring); }
+      .sugg-btn:hover { transform: translateY(-2px); }
+      body[data-state='completed'] .sugg-btn { display: inline-flex; }
+
+      /* popover */
+      .pop {
+        position: fixed; z-index: 20; width: 420px; max-height: 70vh; overflow-y: auto;
+        background: var(--card); border-radius: 16px; box-shadow: 0 20px 50px rgba(31, 36, 48, 0.2); padding: 18px;
+        animation: pop 0.28s var(--spring) both; transform-origin: top center;
+      }
+      .pop[hidden] { display: none; }
+      .pop::before { content: ''; position: absolute; top: -6px; left: var(--ax, 30px); width: 12px; height: 12px; background: var(--card); transform: rotate(45deg); border-radius: 2px; }
+      .pop .eyebrow { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; display: flex; justify-content: space-between; }
+      .pop h3 { font-size: 17px; font-weight: 800; margin: 6px 0 10px; line-height: 1.25; }
+      .pop blockquote { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--bg); color: var(--ink-2); font-style: italic; font-size: 13px; }
+      .facts { display: grid; grid-template-columns: 74px 1fr; gap: 6px 10px; font-size: 13px; margin: 0 0 12px; }
+      .facts dt { font-size: 11px; font-weight: 700; color: var(--ink-3); padding-top: 2px; }
+      .facts dd { margin: 0; }
+      .facts code { background: #f1f3f8; padding: 2px 6px; border-radius: 6px; display: inline-block; }
+      .prow { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; transition: background 0.15s; }
+      .prow:hover:not(:disabled) { background: var(--bg); }
+      .prow:disabled { opacity: 0.5; }
+      .prow .nm { flex: 1; font-weight: 600; }
+      .prow .st { font-size: 12px; color: var(--ink-3); }
+
+      /* badges */
+      .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: capitalize; background: var(--t-queued); color: var(--ink-2); white-space: nowrap; }
+      .badge.passed { background: var(--t-passed); color: var(--green); }
+      .badge.failed { background: var(--t-failed); color: var(--red); }
+      .badge.errored { background: #fff4de; color: #b77708; }
+      .badge.active { background: var(--t-progress); color: var(--blue); }
+
+      /* ---- board ---- */
+      .board { flex: 1; min-height: 0; display: flex; gap: 16px; padding: 20px 24px; overflow-x: auto; }
+      .col { flex: 1 1 0; min-width: 210px; display: flex; flex-direction: column; border-radius: 18px; padding: 12px; min-height: 0; }
+      .col.queued { background: var(--t-queued); }
+      .col.progress { background: var(--t-progress); }
+      .col.passed { background: var(--t-passed); }
+      .col.failed { background: var(--t-failed); }
+      .col.sugg { background: var(--t-sugg); display: none; animation: slidein 0.5s var(--ease) both; }
+      body[data-state='completed'] .col.sugg { display: flex; }
+      .col-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 12px; font-weight: 800; font-size: 13.5px; }
+      .col-head .count { background: rgba(255, 255, 255, 0.8); border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--ink-2); }
+      .col-head i { width: 8px; height: 8px; border-radius: 50%; }
+      .cards { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 8px; scrollbar-width: thin; }
+      .card {
+        width: 100%; display: block; flex-shrink: 0; background: var(--card); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow);
+        transition: transform 0.25s var(--spring), box-shadow 0.25s var(--ease); animation: rise 0.4s var(--ease) both;
+      }
+      .card:hover:not(:disabled) { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+      .card:active:not(:disabled) { transform: translateY(-1px); }
+      .card.ghost { background: rgba(255, 255, 255, 0.55); box-shadow: none; border: 1.5px dashed #d5d9e2; }
+      .card.ghost .who, .card.ghost .task { opacity: 0.6; }
+      .card .who { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; }
+      .card .who > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card .who .badge { margin-left: auto; }
+      .card .task { margin-top: 8px; font-weight: 700; font-size: 14.5px; letter-spacing: -0.01em; }
+      .card .foot { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+      .card .last { margin-top: 8px; padding: 6px 9px; border-radius: 8px; background: var(--t-progress); color: var(--blue); font-size: 12px; font-weight: 600; font-family: var(--mono); }
+      .card.sug .title { font-weight: 700; font-size: 14px; margin-top: 8px; line-height: 1.3; }
+      .empty-col { padding: 18px; text-align: center; color: var(--ink-3); font-size: 12.5px; }
+      .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+      .tag.hardware { background: #ffe9d6; color: #c2570c; }
+      .tag.firmware { background: #e3ebff; color: #3651d6; }
+      .tag.interaction { background: #dcf5e8; color: #17804f; }
+
+      /* ---- sheet ---- */
+      .scrim { position: fixed; inset: 0; background: rgba(24, 28, 38, 0.38); backdrop-filter: blur(2px); z-index: 30; animation: fade 0.3s both; }
+      .scrim[hidden], .sheet[hidden] { display: none; }
+      .sheet {
+        position: fixed; left: 16px; right: 16px; bottom: 0; height: 92%; z-index: 31;
+        background: var(--bg); border-radius: 24px 24px 0 0; box-shadow: 0 -10px 40px rgba(24, 28, 38, 0.2);
+        display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; animation: sheet 0.45s var(--ease) both;
+      }
+      .sheet-head { display: flex; align-items: center; gap: 14px; padding: 8px 22px 10px; position: relative; }
+      .grabber { position: absolute; left: 50%; top: 6px; width: 44px; height: 5px; border-radius: 3px; background: #d5d9e2; transform: translateX(-50%); }
+      .sheet-head h2 { font-size: 16px; font-weight: 800; margin-top: 10px; }
+      .sheet-head .kind { margin-top: 10px; }
+      .close { margin: 10px 0 0 auto; width: 34px; height: 34px; border-radius: 50%; background: var(--card); box-shadow: var(--shadow); display: grid; place-items: center; font-size: 14px; transition: transform 0.2s var(--spring); }
+      .close:hover { transform: rotate(90deg); }
+      .sheet-body { min-height: 0; display: grid; grid-template-columns: 60fr 40fr; gap: 16px; padding: 0 22px 12px; }
+      .left { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+      .viewport {
+        position: relative; flex: 1; min-height: 0; border-radius: 20px; overflow: hidden; cursor: grab; user-select: none;
+        display: grid; place-items: center;
+        background: radial-gradient(ellipse 60% 50% at 50% 45%, rgba(255, 255, 255, 0.9), transparent 70%), linear-gradient(180deg, #e9edf5 0%, #dfe4ee 100%);
+        box-shadow: inset 0 0 80px rgba(31, 36, 48, 0.12);
+      }
+      .viewport::before {
+        content: ''; position: absolute; left: -20%; right: -20%; bottom: -30%; height: 70%;
+        background-image: linear-gradient(rgba(74, 108, 247, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(74, 108, 247, 0.12) 1px, transparent 1px);
+        background-size: 40px 40px; transform: perspective(500px) rotateX(62deg); transform-origin: top;
+        -webkit-mask-image: linear-gradient(transparent, #000 40%);
+        mask-image: linear-gradient(transparent, #000 40%);
+      }
+      .viewport::after { content: ''; position: absolute; left: 50%; bottom: 11%; width: 170px; height: 26px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(rgba(31, 36, 48, 0.3), transparent 70%); }
+      .viewport.dragging { cursor: grabbing; }
+      .stage { position: relative; z-index: 1; height: 72%; aspect-ratio: 180 / 320; transform-style: preserve-3d; transition: transform 0.6s var(--ease); filter: drop-shadow(0 22px 20px rgba(31, 36, 48, 0.3)); }
+      .stage svg { width: 100%; height: 100%; display: block; }
+      .stage .key, .stage .screen text, .stage .fx { transition: transform 0.7s var(--spring), opacity 0.5s var(--ease); transform-box: fill-box; transform-origin: center; }
+      .stage .fx { opacity: 0; }
+      .stage .key.pressed rect { fill: #4a6cf7; }
+      .viewport.after-move_button .key-select { transform: translateY(16px); }
+      .viewport.after-resize_text .screen text { transform: scale(1.5); }
+      .viewport.after-confirm_dialog .fx-dialog, .viewport.after-change_timeout .fx-timeout, .viewport.after-add_audio_cue .fx-audio { opacity: 1; }
+      .vp-hint { position: absolute; z-index: 2; left: 14px; bottom: 12px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); background: rgba(255, 255, 255, 0.75); padding: 4px 10px; border-radius: 999px; }
+      .vp-tag { position: absolute; z-index: 2; left: 14px; top: 12px; }
+      .pills { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 6px; flex-shrink: 0; }
+      .pill {
+        flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px 7px 8px; border-radius: 999px;
+        background: var(--card); box-shadow: var(--shadow); font-weight: 600; font-size: 12.5px; transition: transform 0.2s var(--spring), box-shadow 0.2s;
+      }
+      .pill:hover:not(:disabled) { transform: translateY(-2px); }
+      .pill:disabled { opacity: 0.45; box-shadow: none; background: rgba(255, 255, 255, 0.5); }
+      .pill.on { background: var(--ink); color: #fff; }
+      .pill .tag { font-size: 9.5px; }
+      .g { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; flex-shrink: 0; font-size: 10px; font-weight: 800; background: var(--t-queued); color: var(--ink-3); }
+      .g.passed { background: var(--green); color: #fff; }
+      .g.failed { background: var(--red); color: #fff; }
+      .g.errored { background: var(--amber); color: #fff; }
+      .g.active { background: var(--t-progress); color: var(--blue); }
+      .g.active::after { content: ''; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite; }
+      .right { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px 4px 12px; scrollbar-width: thin; }
+      .panel { background: var(--card); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); animation: rise 0.4s var(--ease) both; }
+      .panel:nth-child(2) { animation-delay: 0.06s; }
+      .panel:nth-child(3) { animation-delay: 0.12s; }
+      .panel .eyebrow { font-size: 11px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+      .who-row { display: flex; align-items: center; gap: 12px; }
+      .who-row h3 { font-size: 16px; font-weight: 800; }
+      .who-row .badge { margin-left: auto; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+      .chip { padding: 3px 10px; border-radius: 999px; background: #f1ecff; color: #6d43d8; font-size: 11.5px; font-weight: 700; }
+      .chip.none { background: var(--bg); color: var(--ink-3); }
+      .action { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 8px; animation: rise 0.35s var(--ease) both; }
+      .reasoning { display: block; padding: 10px 12px; border-left: 3px solid #c9d3ff; background: #f6f8ff; border-radius: 0 10px 10px 0; color: var(--ink-2); font-style: italic; animation: fade 0.5s both; }
+      .reasoning::before { content: '\201C'; }
+      .reasoning::after { content: '\201D'; }
+      .frame { margin: 12px 0 0; border-radius: 12px; overflow: hidden; background: #15181c; }
+      .frame svg { display: block; width: 100%; }
+      .frame figcaption { background: #22262c; color: #c9d1d9; font-size: 11.5px; padding: 6px 10px; display: flex; align-items: center; gap: 6px; }
+      .frame figcaption::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #ff5a5f; animation: pulse 1.4s infinite; }
+      .panel.failure { background: #fff5f5; box-shadow: inset 0 0 0 1.5px #f7caca; }
+      .panel.failure.errored { background: #fffaf0; box-shadow: inset 0 0 0 1.5px #f5dba6; }
+      .panel.failure .eyebrow { color: var(--red); }
+      .panel.failure.errored .eyebrow { color: #b77708; }
+      .panel.failure p { margin-top: 6px; }
+      .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--bg); margin: 12px 0 10px; }
+      .seg button { padding: 6px 18px; border-radius: 999px; font-weight: 700; font-size: 12.5px; color: var(--ink-2); transition: background 0.25s, color 0.25s, box-shadow 0.25s; }
+      .seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+      .ctype { display: block; padding: 8px 10px; border-radius: 10px; background: #f1f3f8; }
+      .ev { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; transition: background 0.15s; }
+      .ev:hover { background: var(--bg); }
+      .ev .nm { flex: 1; font-weight: 700; }
+      .ev .sec { font-family: var(--mono); font-size: 12px; color: var(--violet); }
+
+      /* transport docked at the sheet's bottom edge */
+      .transport { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 14px; align-items: center; padding: 12px 22px 16px; background: var(--card); border-top: 1px solid var(--line); }
+      .transport[hidden] { display: none; }
+      .play { width: 40px; height: 40px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 14px rgba(74, 108, 247, 0.35); transition: transform 0.2s var(--spring); }
+      .play:hover { transform: scale(1.08); }
+      .transport input[type='range'] { width: 100%; accent-color: var(--blue); cursor: pointer; }
+      .transport .pos { font-weight: 700; font-size: 12.5px; color: var(--ink-2); }
+      .steps { grid-column: 1 / -1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+      .steps button { flex-shrink: 0; padding: 5px 11px; border-radius: 999px; background: var(--bg); color: var(--ink-2); font-size: 12px; font-weight: 600; white-space: nowrap; transition: background 0.2s, color 0.2s; }
+      .steps button b { margin-right: 5px; opacity: 0.6; font-variant-numeric: tabular-nums; }
+      .steps button.done { background: #dfe6ff; color: var(--blue); }
+      .steps button.next { background: var(--blue); color: #fff; }
+      .steps button:hover { box-shadow: inset 0 0 0 1.5px var(--blue); }
+
+      @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes pop { from { opacity: 0; transform: translateY(-6px) scale(0.96); } to { opacity: 1; transform: none; } }
+      @keyframes sheet { from { transform: translateY(100%); } to { transform: none; } }
+      @keyframes slidein { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes pulse { 50% { opacity: 0.35; transform: scale(0.75); } }
+      @media (max-width: 1360px) { .pchip .meta { display: none; } .pchip .tog { padding-right: 3px; } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body data-state="running">
+    <main id="dashboard">
+      <header class="topbar">
+        <div class="brand"><span class="logo">∞</span>Infallible</div>
+        <div class="runpill">
+          <span class="state"><i></i><span id="run-state"></span></span>
+          <span>Run <code id="run-id"></code></span>
+          <span>Started <span class="num" id="run-started"></span></span>
+          <span class="num" id="run-counts"></span>
+        </div>
+        <div class="group">
+          <span class="lbl">Tasks <span class="num" id="tasks-done"></span></span>
+          <div class="dots" id="dots"></div>
+        </div>
+        <span class="eval-chip"><span class="spin"></span>Evaluating</span>
+        <button class="sugg-btn" id="sugg-btn">✦ See suggestions (<span class="num" id="sugg-n"></span>)</button>
+        <div class="spacer"></div>
+        <div class="filters" id="filters"></div>
+      </header>
+      <section class="board" id="board"></section>
+    </main>
+
+    <div class="pop" id="pop" hidden></div>
+
+    <div class="scrim" id="scrim" hidden></div>
+    <section class="sheet" id="sheet" hidden role="dialog" aria-modal="true">
+      <header class="sheet-head">
+        <span class="grabber"></span>
+        <h2 id="sb-title"></h2>
+        <span class="kind" id="sb-kind"></span>
+        <button class="close" id="sb-close" aria-label="Close">✕</button>
+      </header>
+      <div class="sheet-body">
+        <div class="left">
+          <div class="viewport" id="viewport">
+            <span class="vp-tag" id="vp-tag"></span>
+            <div class="stage" id="stage"></div>
+            <span class="vp-hint">Drag to orbit · scroll to zoom</span>
+          </div>
+          <div class="pills" id="pills"></div>
+        </div>
+        <div class="right" id="sb-right"></div>
+      </div>
+      <footer class="transport" id="transport" hidden>
+        <button class="play" id="play" aria-label="Pause">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path id="play-icon" d="M5 3.5v9M11 3.5v9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        <input type="range" id="scrub" min="0" max="10" value="0" aria-label="Scrub steps" />
+        <span class="pos num" id="pos"></span>
+        <ol class="steps" id="steps"></ol>
+      </footer>
+    </section>
+
+    <script src="_shared/mock.js"></script>
+    <script>
+      const M = window.MOCK;
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const HUES = { 'p-control': '#4a6cf7', 'p-routine': '#e0797e', 'p-lowvision': '#8b5cf6', 'p-teen': '#14a3a0', 'p-tremor': '#e39b17' };
+      const av = (p, lg) => `<span class="av${lg ? ' lg' : ''}" style="background:${HUES[p.id] || '#888'}">${esc(p.name[0])}</span>`;
+      const g = (st) => `<span class="g ${st}">${st === 'passed' ? '✓' : st === 'failed' || st === 'errored' ? '✕' : st === 'active' ? '' : '·'}</span>`;
+      const state = () => document.body.dataset.state;
+      const statusOf = (a, tid) => a.outcomes[tid] || (a.currentTaskId === tid ? 'active' : 'pending');
+
+      let filter = new Set();
+      let popTask = null;
+      let sb = null;
+      let replay = { cursor: 0, playing: true, timer: null };
+      let after = false;
+      let flipTimer = null;
+
+      /* ---- dashboard ---- */
+      function renderDashboard() {
+        $('#run-state').textContent = state();
+        $('#run-id').textContent = M.run.id.slice(0, 8);
+        $('#run-started').textContent = M.run.startedAt;
+        $('#run-counts').textContent = `${M.agents.length} personas · ${M.tasks.length} tasks`;
+        const done = M.tasks.filter((t) => M.taskStatus(t.id) === 'done').length;
+        $('#tasks-done').textContent = `${done}/${M.tasks.length}`;
+        $('#sugg-n').textContent = M.suggestions.length;
+
+        $('#dots').innerHTML = M.tasks
+          .map((t, i) => {
+            const st = M.taskStatus(t.id);
+            return `<button class="dot ${st} ${popTask === t.id ? 'on' : ''}" data-task="${t.id}" title="${esc(t.short)}" aria-label="${esc(t.short)}: ${st}">${st === 'done' ? '✓' : i + 1}</button>`;
+          })
+          .join('');
+        $('#dots').querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePop(b.dataset.task === popTask ? null : b.dataset.task);
+          }),
+        );
+
+        $('#filters').classList.toggle('filtering', filter.size > 0);
+        $('#filters').innerHTML = M.agents
+          .map((a) => {
+            const p = M.personaOf(a);
+            const t = M.taskById[a.currentTaskId];
+            const sub = state() === 'completed' ? 'done' : a.status === 'error' ? 'error' : `<span class="spin"></span>${esc(t ? t.short : a.status)}`;
+            return `<div class="pchip ${filter.has(a.id) ? 'on' : ''}"><button class="tog" data-filter="${a.id}" aria-pressed="${filter.has(a.id)}" title="${esc(p.name)}, ${p.age} · filter board">${av(p)}<span class="meta"><b>${esc(p.name)}, ${p.age}</b><span>${sub}</span><span class="score num"><span class="p">${a.passed} pass</span> · <span class="f">${a.failed + a.errored} fail</span></span></span></button><button class="open" data-agent="${a.id}" title="Open in sandbox" aria-label="Open ${esc(p.name)} in sandbox">↗</button></div>`;
+          })
+          .join('');
+        $('#filters').querySelectorAll('[data-filter]').forEach((b) =>
+          b.addEventListener('click', () => {
+            const id = b.dataset.filter;
+            if (filter.has(id)) filter.delete(id);
+            else filter.add(id);
+            renderDashboard();
+          }),
+        );
+        $('#filters').querySelectorAll('[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, null)));
+        renderBoard();
+        if (popTask) renderPop();
+      }
+
+      function renderBoard() {
+        const cols = { queued: [], progress: [], passed: [], failed: [] };
+        for (const t of M.tasks)
+          for (const a of M.agents) {
+            if (filter.size && !filter.has(a.id)) continue;
+            const st = statusOf(a, t.id);
+            const key = st === 'pending' ? 'queued' : st === 'active' ? 'progress' : st === 'errored' ? 'failed' : st;
+            cols[key].push({ a, t, st });
+          }
+        const card = ({ a, t, st }) => {
+          const p = M.personaOf(a);
+          const h = M.historyOf(a.id, t.id);
+          const last = h[h.length - 1];
+          const badge =
+            st === 'pending' ? '<span class="badge">queued</span>' : st === 'active' ? `<span class="badge active">${state() === 'running' ? 'working' : 'stopped'}</span>` : `<span class="badge ${st}">${st}</span>`;
+          return `<button class="card ${st === 'pending' ? 'ghost' : ''}" data-agent="${a.id}" data-task="${t.id}" ${st === 'pending' ? 'disabled' : ''}>
+            <div class="who">${av(p)}<span>${esc(p.name)}</span>${badge}</div>
+            <div class="task">${esc(t.short)}</div>
+            <div class="foot num">${st === 'active' ? '<span class="spin"></span>' : ''}${h.length ? `${h.length} steps` : `max ${t.maxSteps} steps`}</div>
+            ${st === 'active' && last ? `<div class="last">${esc(last.action)}</div>` : ''}
+          </button>`;
+        };
+        const col = (key, title, dot, items) =>
+          `<div class="col ${key}"><div class="col-head"><i style="background:${dot}"></i>${title}<span class="count num">${items.length}</span></div><div class="cards">${items.length ? items.map(card).join('') : '<p class="empty-col">Nothing here</p>'}</div></div>`;
+        const sugg =
+          `<div class="col sugg"><div class="col-head"><i style="background:var(--violet)"></i>Suggestions<span class="count num">${M.suggestions.length}</span></div><div class="cards">` +
+          M.suggestions
+            .map((s) => `<button class="card sug" data-sug="${s.id}"><span class="tag ${s.category}">${s.category}</span><div class="title">${esc(s.title)}</div><div class="foot num">${s.evidence.length} evidence · <code>${s.change.type}</code></div></button>`)
+            .join('') +
+          `</div></div>`;
+        $('#board').innerHTML =
+          col('queued', 'Queued', '#b7bdc9', cols.queued) +
+          col('progress', 'In progress', 'var(--blue)', cols.progress) +
+          col('passed', 'Passed', 'var(--green)', cols.passed) +
+          col('failed', 'Failed', 'var(--red)', cols.failed) +
+          sugg;
+        $('#board').querySelectorAll('.card[data-agent]').forEach((b) => b.addEventListener('click', () => openAgent(b.dataset.agent, b.dataset.task)));
+        $('#board').querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: b.dataset.sug })));
+      }
+
+      /* task popover, anchored under its dot */
+      function togglePop(id) {
+        popTask = id;
+        $('#dots').querySelectorAll('.dot').forEach((d) => d.classList.toggle('on', d.dataset.task === id));
+        if (!id) return ($('#pop').hidden = true);
+        renderPop();
+      }
+      function renderPop() {
+        const t = M.taskById[popTask];
+        const pop = $('#pop');
+        const st = M.taskStatus(t.id);
+        pop.innerHTML = `
+          <div class="eyebrow"><span>Task ${M.tasks.indexOf(t) + 1} of ${M.tasks.length}</span><span class="badge ${st === 'done' ? 'passed' : st}">${st}</span></div>
+          <h3>${esc(t.name)}</h3>
+          <blockquote>${esc(t.description)}</blockquote>
+          <dl class="facts"><dt>Goal</dt><dd>${esc(t.goal)}</dd><dt>Success</dt><dd><code>${esc(t.success)}</code></dd><dt>Max steps</dt><dd class="num">${t.maxSteps}</dd></dl>
+          <ul>${M.agents
+            .map((a) => {
+              const p = M.personaOf(a);
+              const s = statusOf(a, t.id);
+              const n = M.historyOf(a.id, t.id).length;
+              return `<li><button class="prow" data-agent="${a.id}" ${s === 'pending' ? 'disabled' : ''}>${g(s)}${av(p)}<span class="nm">${esc(p.name)}</span><span class="st num">${n ? n + ' steps' : ''}</span><span class="badge ${s}">${s === 'active' ? 'live' : s}</span></button></li>`;
+            })
+            .join('')}</ul>`;
+        pop.querySelectorAll('[data-agent]').forEach((b) =>
+          b.addEventListener('click', () => {
+            togglePop(null);
+            openAgent(b.dataset.agent, t.id);
+          }),
+        );
+        pop.hidden = false;
+        const dot = $(`#dots [data-task="${t.id}"]`).getBoundingClientRect();
+        const left = Math.max(12, Math.min(window.innerWidth - 432, dot.left + dot.width / 2 - 40));
+        pop.style.left = left + 'px';
+        pop.style.top = dot.bottom + 12 + 'px';
+        pop.style.setProperty('--ax', dot.left + dot.width / 2 - left - 6 + 'px');
+      }
+      document.addEventListener('click', (e) => {
+        if (popTask && !$('#pop').contains(e.target)) togglePop(null);
+      });
+      $('#sugg-btn').addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: M.suggestions[0].id }));
+
+      function openAgent(agentId, taskId) {
+        const a = M.agentById[agentId];
+        if (taskId && taskId in a.outcomes) return openSandbox({ kind: 'replay', agentId, taskId });
+        if (state() === 'running' && a.status === 'working' && (!taskId || taskId === a.currentTaskId))
+          return openSandbox({ kind: 'live', agentId, taskId: a.currentTaskId });
+        const target = taskId || Object.keys(a.outcomes).pop() || a.currentTaskId;
+        openSandbox({ kind: 'replay', agentId, taskId: target });
+      }
+
+      /* ---- sandbox sheet ---- */
+      function openSandbox(mode) {
+        const wasOpen = !!sb;
+        sb = mode;
+        after = false;
+        clearInterval(replay.timer);
+        clearTimeout(flipTimer);
+        replay = { cursor: 0, playing: true, timer: null };
+        $('#scrim').hidden = false;
+        $('#sheet').hidden = false;
+        $('#stage').dataset.screen = '';
+        renderSandbox();
+        if (mode.kind === 'replay') startReplay();
+        if (!wasOpen) $('#sb-close').focus({ preventScroll: true });
+      }
+      function closeSandbox() {
+        clearInterval(replay.timer);
+        clearTimeout(flipTimer);
+        sb = null;
+        $('#sheet').hidden = true;
+        $('#scrim').hidden = true;
+      }
+      $('#sb-close').addEventListener('click', closeSandbox);
+      $('#scrim').addEventListener('click', closeSandbox);
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (sb) closeSandbox();
+        else if (popTask) togglePop(null);
+      });
+
+      const stepsFor = () => (sb && sb.kind !== 'change' ? M.historyOf(sb.agentId, sb.taskId) : []);
+
+      function renderSandbox() {
+        const right = $('#sb-right');
+        const steps = stepsFor();
+        $('#transport').hidden = sb.kind !== 'replay';
+        $('#viewport').className = 'viewport';
+
+        if (sb.kind === 'change') {
+          const s = M.suggestions.find((x) => x.id === sb.suggestionId);
+          $('#sb-title').textContent = 'Proposed change';
+          $('#sb-kind').innerHTML = `<span class="badge" style="background:var(--t-sugg);color:var(--violet)">Suggestion ${M.suggestions.indexOf(s) + 1} of ${M.suggestions.length}</span>`;
+          $('#vp-tag').innerHTML = `<span class="tag ${s.category}">${s.category}</span>`;
+          $('#stage').innerHTML = M.pumpSvg({ screen: 'bolus' });
+          injectFx();
+          right.innerHTML = `
+            <div class="panel">
+              <span class="tag ${s.category}">${s.category}</span>
+              <h3 style="font-size:19px;font-weight:800;margin-top:10px;line-height:1.25">${esc(s.title)}</h3>
+              <p class="muted" style="margin-top:8px">${esc(s.rationale)}</p>
+              <div class="seg" role="group" aria-label="Before or after"><button class="on" data-after="0">Before</button><button data-after="1">After</button></div>
+              <code class="ctype">${esc(s.change.type)}(${esc(JSON.stringify(s.change.params).replace(/[{}"]/g, '').replace(/,/g, ', '))})</code>
+            </div>
+            <div class="panel">
+              <span class="eyebrow">Evidence · ${s.evidence.length}</span>
+              <ul style="margin-top:6px">${s.evidence
+                .map((e) => {
+                  const p = M.personaOf(M.agentById[e.agentId]);
+                  return `<li><button class="ev" data-ev-agent="${e.agentId}" data-ev-task="${e.taskId}">${av(p)}<span class="nm">${esc(p.name)}</span><span class="muted">${esc(M.taskById[e.taskId].short)}</span><span class="sec num">§${e.step}</span></button></li>`;
+                })
+                .join('')}</ul>
+            </div>`;
+          right.querySelectorAll('[data-after]').forEach((b) => b.addEventListener('click', () => setAfter(s, b.dataset.after === '1')));
+          right.querySelectorAll('[data-ev-agent]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'replay', agentId: b.dataset.evAgent, taskId: b.dataset.evTask })));
+          $('#pills').innerHTML = M.suggestions
+            .map((x, i) => `<button class="pill ${x.id === s.id ? 'on' : ''}" data-sug="${x.id}"><span class="tag ${x.category}">${i + 1}</span>${esc(x.title)}</button>`)
+            .join('');
+          $('#pills').querySelectorAll('[data-sug]').forEach((b) => b.addEventListener('click', () => openSandbox({ kind: 'change', suggestionId: b.dataset.sug })));
+          flipTimer = setTimeout(() => {
+            if (sb && sb.kind === 'change' && sb.suggestionId === s.id && !after) setAfter(s, true);
+          }, 900);
+          return;
+        }
+
+        const a = M.agentById[sb.agentId];
+        const p = M.personaOf(a);
+        const t = M.taskById[sb.taskId];
+        const outcome = a.outcomes[sb.taskId];
+        $('#sb-title').textContent = `${p.name} · ${t ? t.short : ''}`;
+        $('#sb-kind').innerHTML =
+          sb.kind === 'live' ? '<span class="badge active"><span class="spin"></span>Live</span>' : `<span class="badge ${outcome || ''}">Replay${outcome ? ' · ' + outcome : ''}</span>`;
+        $('#vp-tag').innerHTML = '';
+
+        right.innerHTML = `
+          <div class="panel">
+            <div class="who-row">${av(p, true)}<div><h3>${esc(p.name)}</h3><span class="muted">${p.age} · ${esc(p.gender)}</span></div><span class="badge ${a.status === 'working' ? 'active' : ''}">${esc(a.status)}</span></div>
+            <div class="chips">${p.modifiers.length ? p.modifiers.map((m) => `<span class="chip">${esc(m.label)}</span>`).join('') : '<span class="chip none">no modifiers</span>'}</div>
+          </div>
+          <div class="panel" id="step-panel"></div>
+          ${outcome === 'failed' || outcome === 'errored' ? `<div class="panel failure ${outcome}"><span class="eyebrow">${outcome === 'errored' ? '⚠ Errored' : '✕ Failed'}</span><p>${esc(a.reasons[sb.taskId] || 'No reason reported.')}</p></div>` : ''}`;
+        renderStep();
+
+        $('#pills').innerHTML = M.tasks
+          .map((x) => {
+            const st = statusOf(a, x.id);
+            const has = M.historyOf(a.id, x.id).length > 0;
+            return `<button class="pill ${x.id === sb.taskId ? 'on' : ''}" data-task="${x.id}" data-live="${st === 'active' ? 1 : 0}" ${has ? '' : 'disabled'}>${g(st)}${esc(x.short)}</button>`;
+          })
+          .join('');
+        $('#pills').querySelectorAll('[data-task]').forEach((b) =>
+          b.addEventListener('click', () => openSandbox({ kind: b.dataset.live === '1' && state() === 'running' ? 'live' : 'replay', agentId: a.id, taskId: b.dataset.task })),
+        );
+
+        if (sb.kind === 'replay') {
+          $('#scrub').max = steps.length;
+          $('#steps').innerHTML = steps.map((s, i) => `<li><button data-i="${i}"><b>${i + 1}</b>${esc(s.action)}</button></li>`).join('');
+          $('#steps').querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => scrub(Number(b.dataset.i) + 1)));
+          renderTransport();
+        }
+      }
+
+      function screenFor(cursor, steps, t) {
+        if (!steps.length) return 'home';
+        if (cursor === 0) return t && t.id === 't-alarm' ? 'alarm' : 'home';
+        const seen = steps.slice(0, cursor).map((s) => s.action);
+        if (t && t.id === 't-basal' && seen.some((x) => x === 'press select')) return 'basal';
+        if (seen.some((x) => x.startsWith('hold up') || x === 'press up')) return 'bolus';
+        if (seen.some((x) => x === 'press select')) return 'home';
+        return t && t.id === 't-alarm' ? 'alarm' : 'home';
+      }
+
+      function renderStep() {
+        const steps = stepsFor();
+        const shown = sb.kind === 'live' ? steps.length : replay.cursor;
+        const cur = steps[shown - 1];
+        const t = M.taskById[sb.taskId];
+        const a = M.agentById[sb.agentId];
+        const want = screenFor(shown, steps, t);
+        $('#step-panel').innerHTML = `
+          <span class="eyebrow num">${sb.kind === 'replay' ? `Step ${shown} of ${steps.length}` : `Step ${shown}`} · ${esc(t ? t.short : '')}</span>
+          <div class="action">${cur ? esc(cur.action) : 'Ready to start'}</div>
+          ${cur && cur.reasoning ? `<q class="reasoning">${esc(cur.reasoning)}</q>` : ''}
+          ${sb.kind === 'live' ? `<figure class="frame">${M.frameSvg(a.personaId, { screen: want })}<figcaption>What they see · heard confirmation beep</figcaption></figure>` : ''}`;
+        const stage = $('#stage');
+        const pressed = cur && cur.action.match(/^(press|hold) (\w+)/);
+        if (stage.dataset.screen !== want) {
+          stage.dataset.screen = want;
+          stage.innerHTML = M.pumpSvg({ screen: want });
+        }
+        stage.querySelectorAll('[data-button]').forEach((k) => k.classList.toggle('pressed', !!pressed && k.dataset.button === pressed[2]));
+      }
+
+      /* replay transport */
+      function startReplay() {
+        clearInterval(replay.timer);
+        replay.timer = setInterval(() => {
+          if (!replay.playing) return;
+          if (replay.cursor >= stepsFor().length) {
+            replay.playing = false;
+            renderTransport();
+            return;
+          }
+          replay.cursor += 1;
+          renderStep();
+          renderTransport();
+        }, 1100);
+      }
+      function scrub(n) {
+        replay.playing = false;
+        replay.cursor = n;
+        renderStep();
+        renderTransport();
+      }
+      function renderTransport() {
+        const n = stepsFor().length;
+        const playing = replay.playing && replay.cursor < n;
+        $('#scrub').value = replay.cursor;
+        $('#pos').textContent = `${replay.cursor} / ${n}`;
+        $('#play-icon').setAttribute('d', playing ? 'M5 3.5v9M11 3.5v9' : 'M5 3.5v9l7-4.5z');
+        $('#play-icon').setAttribute('fill', playing ? 'none' : 'currentColor');
+        $('#play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+        $('#steps')
+          .querySelectorAll('button')
+          .forEach((b, i) => {
+            b.className = i < replay.cursor ? 'done' : i === replay.cursor ? 'next' : '';
+            if (i === replay.cursor) b.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+          });
+      }
+      $('#play').addEventListener('click', () => {
+        if (replay.cursor >= stepsFor().length) {
+          replay.cursor = 0;
+          replay.playing = true;
+          renderStep();
+        } else replay.playing = !replay.playing;
+        renderTransport();
+      });
+      $('#scrub').addEventListener('input', (e) => scrub(Number(e.target.value)));
+
+      /* change mode fx */
+      function injectFx() {
+        $('#stage svg').insertAdjacentHTML(
+          'beforeend',
+          `<g class="fx fx-dialog"><rect x="30" y="52" width="120" height="60" rx="4" fill="#0b1118" stroke="#9fb3c8"/><text x="90" y="74" text-anchor="middle" font-size="8" fill="#e8f0f8" font-family="system-ui">You delivered 0.5 U 20 s ago.</text><text x="90" y="88" text-anchor="middle" font-size="9" font-weight="700" fill="#ffb84d" font-family="system-ui">Deliver again?</text><text x="90" y="104" text-anchor="middle" font-size="7.5" fill="#9fb3c8" font-family="system-ui">BACK = no · SELECT = yes</text></g>` +
+            `<g class="fx fx-timeout"><rect x="118" y="38" width="38" height="14" rx="7" fill="#4a6cf7"/><text x="137" y="48" text-anchor="middle" font-size="8" fill="#fff" font-family="system-ui">90 s</text></g>` +
+            `<g class="fx fx-audio" fill="none" stroke="#ffb84d" stroke-width="1.5"><circle cx="22" cy="22" r="9"/><circle cx="22" cy="22" r="15" opacity=".6"/><circle cx="22" cy="22" r="21" opacity=".3"/></g>`,
+        );
+      }
+      function setAfter(s, v) {
+        after = v;
+        $('#sb-right').querySelectorAll('[data-after]').forEach((x) => x.classList.toggle('on', (x.dataset.after === '1') === v));
+        $('#viewport').className = 'viewport' + (v ? ' after-' + s.change.type : '');
+      }
+
+      /* cosmetic orbit */
+      (function orbit() {
+        const vp = $('#viewport');
+        const stage = $('#stage');
+        let drag = null;
+        let rx = -4;
+        let ry = -16;
+        let z = 1;
+        const apply = () => (stage.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${z})`);
+        apply();
+        vp.addEventListener('pointerdown', (e) => {
+          drag = { x: e.clientX, y: e.clientY, rx, ry };
+          vp.classList.add('dragging');
+          stage.style.transition = 'none';
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!drag) return;
+          ry = drag.ry + (e.clientX - drag.x) * 0.4;
+          rx = Math.max(-40, Math.min(40, drag.rx - (e.clientY - drag.y) * 0.3));
+          apply();
+        });
+        window.addEventListener('pointerup', () => {
+          drag = null;
+          vp.classList.remove('dragging');
+          stage.style.transition = '';
+        });
+        vp.addEventListener(
+          'wheel',
+          (e) => {
+            e.preventDefault();
+            z = Math.max(0.6, Math.min(1.6, z - e.deltaY * 0.001));
+            apply();
+          },
+          { passive: false },
+        );
+      })();
+
+      /* mock controls */
+      document.addEventListener('mock:state', () => {
+        renderDashboard();
+        if (sb && sb.kind === 'live' && state() !== 'running') openAgent(sb.agentId, sb.taskId);
+      });
+      document.addEventListener('mock:open', (e) => {
+        const k = e.detail.kind;
+        if (k === 'dashboard') return closeSandbox();
+        if (k === 'change') return openSandbox({ kind: 'change', suggestionId: M.defaults.change.suggestionId });
+        openSandbox({ kind: k, ...M.defaults[k] });
+      });
+
+      renderDashboard();
+      M.mountControls();
+    </script>
+  </body>
+</html>
