@@ -1,40 +1,26 @@
 # AGENTS.md
 
-Agent personas for usability-testing insulin pumps against MAUDE failure modes. See [prd.md](prd.md).
+Claude-driven personas usability-test insulin pumps against MAUDE failure modes. Design: [docs/prd.md](docs/prd.md). Layout, setup, commands: [docs/development.md](docs/development.md).
 
-## Layout
+## Rules
 
-- `apps/driver`, `apps/agent-persona`, `apps/firmware`: Python (uv workspace)
-- `apps/visualizer`: Tauri (TS + Rust); `apps/scanner`: TS
-- `packages/contracts` (Python, source of truth) → `packages/contracts-ts` (generated; run `pnpm contracts:gen`, never hand-edit)
-- `scripts`: MAUDE download script (`scripts/download_maude.py`) and exploration notebook (`scripts/maude.ipynb`)
+- `packages/contracts` (pydantic) owns every cross-process message. After changing it, run `pnpm contracts:gen`; never hand-edit `packages/contracts-ts`.
+- One lockfile per ecosystem (`uv.lock`, `pnpm-lock.yaml`); shared tooling config lives at the root.
+- Read surrounding code first and match its style. Keep diffs minimal and scoped; no speculative abstractions or unrelated refactors.
+- Verify with `pnpm check` (narrower: `pnpm lint:py`, `pnpm typecheck`, `uv run pytest <path>`); fix formatting with `pnpm format`. Report failures honestly.
+- Secrets go in `.env` (template: `.env.example`), never in git.
 
-## Commands
+## Style
 
-- Setup: `pnpm setup`
-- Verify before finishing: `pnpm check` (lint + typecheck + test). Narrower: `pnpm lint:py`, `pnpm typecheck`, `uv run pytest <path>`
-- Fix formatting: `pnpm format`
-- Stack: `pnpm stack:up` / `stack:down`
-
-## Working rules
-
-- Read surrounding code first; match its style, naming, and idioms.
-- Keep diffs minimal and scoped to the task. No speculative abstractions or unrelated refactors.
-- Run the relevant checks after changes; report failures honestly.
-- Never commit secrets; config goes in `.env` (template: `.env.example`).
-
-## Comments and docs
-
-- Be concise. Everything — code, comments, docs, commit messages — as short as it can be while staying clear.
-- Comment only the non-obvious *why*. No comments restating code, no changelog-style notes, no docstrings on trivial functions.
-- Don't create new docs/READMEs unless asked. Update existing docs only when behavior changes.
+- Everything as short as it can be while staying clear: code, comments, docs, commits.
+- Comment only the non-obvious *why*. No comments restating code, no changelog notes, no docstrings on trivial functions.
+- Don't add docs unless asked; update existing docs when behavior changes.
 
 ## Git
 
-- Do not add Claude (or any AI) as a co-author. No `Co-Authored-By` trailers, no "Generated with" lines in commits or PRs.
-- Short, imperative commit messages.
+- Short, imperative Conventional Commits.
+- No AI co-author trailers or "Generated with" lines.
 
 ## Subagents
 
-- Use smaller/faster models (Sonnet, Haiku) for subagent tasks that don't need Opus: searching, exploration, file summaries, mechanical edits, running checks. Reserve Opus for design and hard debugging.
-- Parallelize independent subagent work.
+- Use smaller models (Sonnet, Haiku) for search, exploration, mechanical edits and checks; reserve Opus for design and hard debugging. Run independent work in parallel.
