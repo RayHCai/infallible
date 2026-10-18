@@ -49,11 +49,24 @@ class FirmwareState(Contract):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
+class AudioCue(Contract):
+    """One sound (and/or vibration) the device emitted."""
+
+    id: str = Field(
+        description='keypad, delivery_start, occlusion, ... Traces only; never shown to the agent.'
+    )
+    priority: Literal['high', 'medium', 'low', 'info']
+    at_ms: int = Field(description='Device time since reset.')
+    level_db: float = Field(description='Peak level at the user, dBA; 0 when silent.')
+    vibrate: bool = False
+    wav_b64: str | None = Field(default=None, description='Mono 16-bit PCM WAV; null when silent.')
+
+
 class FirmwareFrame(Contract):
     png_b64: str
     width: int
     height: int
-    audio: list[str] = Field(default_factory=list, description='Audio cue ids since last frame.')
+    audio: list[AudioCue] = Field(default_factory=list, description='Cues since last frame.')
 
 
 class _InputOp(Contract):

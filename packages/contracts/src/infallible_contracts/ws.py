@@ -40,6 +40,7 @@ class TaskScoredMessage(Contract):
     agent_id: UUID
     task_id: UUID
     outcome: TaskOutcome
+    reason: str | None = Field(default=None, description='Why the task failed or errored.')
 
 
 class SuggestionsReadyMessage(Contract):

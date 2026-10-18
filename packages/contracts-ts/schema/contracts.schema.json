@@ -36,6 +36,12 @@
     "QrPayload": {
       "$ref": "#/$defs/QrPayload"
     },
+    "RenderReply": {
+      "$ref": "#/$defs/RenderReply"
+    },
+    "RenderRequest": {
+      "$ref": "#/$defs/RenderRequest"
+    },
     "Run": {
       "$ref": "#/$defs/Run"
     },
@@ -64,6 +70,8 @@
     "MeshAnnotations",
     "Persona",
     "QrPayload",
+    "RenderReply",
+    "RenderRequest",
     "Run",
     "StartResponse",
     "StopRequest",
@@ -582,6 +590,43 @@
       "title": "BuildSource",
       "type": "string"
     },
+    "ButtonView": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "box": {
+          "description": "x0, y0, x1, y1 in frame pixels; may run off-frame.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "title": "Box",
+          "type": "array"
+        },
+        "facing": {
+          "description": "Button face points toward the eye.",
+          "title": "Facing",
+          "type": "boolean"
+        },
+        "occluded": {
+          "description": "Device geometry blocks the line of sight to it.",
+          "title": "Occluded",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "box",
+        "facing",
+        "occluded"
+      ],
+      "title": "ButtonView",
+      "type": "object"
+    },
     "ChangeType": {
       "description": "Small, closed set so the visualizer can animate every proposal.",
       "enum": [
@@ -743,6 +788,38 @@
         "step"
       ],
       "title": "Evidence",
+      "type": "object"
+    },
+    "EyePose": {
+      "additionalProperties": false,
+      "description": "Agent's eye around the pump centre: angles in radians, radius in pump heights.",
+      "properties": {
+        "yaw": {
+          "default": 0.0,
+          "title": "Yaw",
+          "type": "number"
+        },
+        "pitch": {
+          "default": 0.12,
+          "maximum": 1.2,
+          "minimum": -1.2,
+          "title": "Pitch",
+          "type": "number"
+        },
+        "radius": {
+          "default": 1.7,
+          "maximum": 4,
+          "minimum": 0.6,
+          "title": "Radius",
+          "type": "number"
+        }
+      },
+      "required": [
+        "yaw",
+        "pitch",
+        "radius"
+      ],
+      "title": "EyePose",
       "type": "object"
     },
     "HoldAction": {
@@ -973,6 +1050,83 @@
         "kind"
       ],
       "title": "ReadScreenAction",
+      "type": "object"
+    },
+    "RenderReply": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "render_reply",
+          "default": "render_reply",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "png_b64": {
+          "title": "Png B64",
+          "type": "string"
+        },
+        "buttons": {
+          "items": {
+            "$ref": "#/$defs/ButtonView"
+          },
+          "title": "Buttons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "png_b64",
+        "buttons"
+      ],
+      "title": "RenderReply",
+      "type": "object"
+    },
+    "RenderRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "render_request",
+          "default": "render_request",
+          "title": "Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "pose": {
+          "$ref": "#/$defs/EyePose"
+        },
+        "screen_png_b64": {
+          "description": "Live firmware screen, shown on the device.",
+          "title": "Screen Png B64",
+          "type": "string"
+        },
+        "width": {
+          "exclusiveMinimum": 0,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "exclusiveMinimum": 0,
+          "title": "Height",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "pose",
+        "screen_png_b64",
+        "width",
+        "height"
+      ],
+      "title": "RenderRequest",
       "type": "object"
     },
     "RotateViewAction": {
@@ -1348,6 +1502,19 @@
         },
         "outcome": {
           "$ref": "#/$defs/TaskOutcome"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why the task failed or errored.",
+          "title": "Reason"
         }
       },
       "required": [
@@ -1355,7 +1522,8 @@
         "run_id",
         "agent_id",
         "task_id",
-        "outcome"
+        "outcome",
+        "reason"
       ],
       "title": "TaskScoredMessage",
       "type": "object"

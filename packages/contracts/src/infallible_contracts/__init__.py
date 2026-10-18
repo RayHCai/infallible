@@ -38,6 +38,7 @@ from infallible_contracts.events import (
 from infallible_contracts.firmware import (
     AllocateRequest,
     AllocateResponse,
+    AudioCue,
     FirmwareFrame,
     FirmwareInput,
     FirmwareRequest,
@@ -53,6 +54,7 @@ from infallible_contracts.persona import (
     PersonaAttributes,
     PersonaFile,
 )
+from infallible_contracts.render import ButtonView, EyePose, RenderReply, RenderRequest
 from infallible_contracts.run import (
     Agent,
     BuildSource,
@@ -91,11 +93,13 @@ __all__ = [
     'AgentReady',
     'AllocateRequest',
     'AllocateResponse',
+    'AudioCue',
     'BoxRegion',
     'BuildAccepted',
     'BuildDoneMessage',
     'BuildProgressMessage',
     'BuildSource',
+    'ButtonView',
     'ChangeType',
     'ConnectRequest',
     'ConnectResponse',
@@ -103,6 +107,7 @@ __all__ = [
     'DoneAction',
     'DriverMessage',
     'Evidence',
+    'EyePose',
     'FirmwareFrame',
     'FirmwareInput',
     'FirmwareRequest',
@@ -121,6 +126,8 @@ __all__ = [
     'QrPayload',
     'ReadScreenAction',
     'ReleaseRequest',
+    'RenderReply',
+    'RenderRequest',
     'RotateViewAction',
     'Run',
     'RunState',

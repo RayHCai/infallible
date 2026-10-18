@@ -25,6 +25,8 @@ from infallible_contracts import (
     MeshAnnotations,
     Persona,
     QrPayload,
+    RenderReply,
+    RenderRequest,
     Run,
     StartResponse,
     StopRequest,
@@ -47,6 +49,8 @@ _MODELS: dict[str, type[BaseModel]] = {
     'Task': Task,
     'MeshAnnotations': MeshAnnotations,
     'SuggestionsFile': SuggestionsFile,
+    'RenderRequest': RenderRequest,
+    'RenderReply': RenderReply,
 }
 _UNIONS: dict[str, Any] = {
     'Action': Action,

@@ -86,6 +86,8 @@ export interface InfallibleContracts {
   MeshAnnotations: MeshAnnotations;
   Persona: Persona;
   QrPayload: QrPayload;
+  RenderReply: RenderReply;
+  RenderRequest: RenderRequest;
   Run: Run;
   StartResponse: StartResponse;
   StopRequest: StopRequest;
@@ -346,6 +348,10 @@ export interface TaskScoredMessage {
   agent_id: string;
   task_id: string;
   outcome: TaskOutcome;
+  /**
+   * Why the task failed or errored.
+   */
+  reason: string | null;
 }
 /**
  * This interface was referenced by `InfallibleContracts`'s JSON-Schema
@@ -429,6 +435,64 @@ export interface Modifier {
 export interface QrPayload {
   run_id: string;
   driver_url: string;
+}
+/**
+ * This interface was referenced by `InfallibleContracts`'s JSON-Schema
+ * via the `definition` "RenderReply".
+ */
+export interface RenderReply {
+  type: 'render_reply';
+  id: number;
+  png_b64: string;
+  buttons: ButtonView[];
+}
+/**
+ * This interface was referenced by `InfallibleContracts`'s JSON-Schema
+ * via the `definition` "ButtonView".
+ */
+export interface ButtonView {
+  id: string;
+  /**
+   * x0, y0, x1, y1 in frame pixels; may run off-frame.
+   *
+   * @minItems 4
+   * @maxItems 4
+   */
+  box: [number, number, number, number];
+  /**
+   * Button face points toward the eye.
+   */
+  facing: boolean;
+  /**
+   * Device geometry blocks the line of sight to it.
+   */
+  occluded: boolean;
+}
+/**
+ * This interface was referenced by `InfallibleContracts`'s JSON-Schema
+ * via the `definition` "RenderRequest".
+ */
+export interface RenderRequest {
+  type: 'render_request';
+  id: number;
+  pose: EyePose;
+  /**
+   * Live firmware screen, shown on the device.
+   */
+  screen_png_b64: string;
+  width: number;
+  height: number;
+}
+/**
+ * Agent's eye around the pump centre: angles in radians, radius in pump heights.
+ *
+ * This interface was referenced by `InfallibleContracts`'s JSON-Schema
+ * via the `definition` "EyePose".
+ */
+export interface EyePose {
+  yaw: number;
+  pitch: number;
+  radius: number;
 }
 /**
  * This interface was referenced by `InfallibleContracts`'s JSON-Schema
