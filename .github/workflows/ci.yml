@@ -43,6 +43,7 @@ jobs:
             ts:
               - 'apps/visualizer/**'
               - 'apps/scanner/**'
+              - 'assets/**'
               - 'packages/contracts-ts/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -60,6 +61,7 @@ jobs:
               - 'packages/contracts/**'
               - 'pyproject.toml'
               - 'uv.lock'
+              - 'scripts/pyproject.toml'
               - '.dockerignore'
               - 'compose.yaml'
 
@@ -110,6 +112,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prettier --check .
       - run: pnpm -r lint
+      - run: pnpm exec eslint assets
       - run: pnpm -r typecheck
       - run: pnpm -r test
       - name: Build visualizer frontend

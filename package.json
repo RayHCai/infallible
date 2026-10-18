@@ -18,7 +18,7 @@
     "contracts:gen": "uv run python -m infallible_contracts.export_schema packages/contracts-ts/schema/contracts.schema.json && pnpm --filter @infallible/contracts generate",
     "lint": "pnpm lint:py && pnpm lint:ts && pnpm lint:rs",
     "lint:py": "uv run ruff check . && uv run ruff format --check .",
-    "lint:ts": "prettier --check . && pnpm -r lint",
+    "lint:ts": "prettier --check . && pnpm -r lint && eslint assets",
     "lint:rs": "cargo fmt --manifest-path apps/visualizer/src-tauri/Cargo.toml --check && cargo clippy --manifest-path apps/visualizer/src-tauri/Cargo.toml --all-targets -- -D warnings",
     "format": "uv run ruff check --fix . && uv run ruff format . && prettier --write . && cargo fmt --manifest-path apps/visualizer/src-tauri/Cargo.toml",
     "typecheck": "uv run mypy && pnpm -r typecheck",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@napi-rs/canvas": "^1.0.11",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",

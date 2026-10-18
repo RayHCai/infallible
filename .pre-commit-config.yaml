@@ -73,10 +73,10 @@ repos:
         types_or: [javascript, jsx, ts, tsx, json, yaml, css, html]
 
       - id: eslint
-        name: eslint (visualizer, contracts-ts)
+        name: eslint (visualizer, contracts-ts, assets)
         entry: pnpm exec eslint --fix --max-warnings=0
         language: system
-        files: ^(apps/visualizer/src|packages/contracts-ts)/.*\.(ts|tsx|mjs)$
+        files: ^(apps/visualizer/src|packages/contracts-ts|assets)/.*\.(ts|tsx|js|mjs)$
 
       - id: cargo-fmt
         name: cargo fmt
