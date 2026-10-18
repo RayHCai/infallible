@@ -7,14 +7,20 @@ from uuid import UUID
 
 import aiosqlite
 
-from infallible_contracts import Agent, Interaction, Run, RunState, TaskResult
+from infallible_contracts import (
+    Agent,
+    BuildSource,
+    Interaction,
+    Run,
+    RunListing,
+    RunState,
+    TaskResult,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from infallible_contracts import BuildSource
-
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class Database:
@@ -43,6 +49,9 @@ class Database:
 
     async def _migrate(self) -> None:
         (version,) = await (await self._conn.execute('PRAGMA user_version')).fetchone() or (0,)
+        if version == 1:
+            for column in ('reason', 'summary'):
+                await self._conn.execute(f'ALTER TABLE task_results ADD COLUMN {column} TEXT')
         if version < SCHEMA_VERSION:
             schema = resources.files('driver.db').joinpath('schema.sql').read_text('utf-8')
             await self._conn.executescript(schema)
@@ -94,6 +103,33 @@ class Database:
             current_task_index=row['current_task_index'],
         )
 
+    async def list_runs(self) -> list[RunListing]:
+        cur = await self._conn.execute(
+            'SELECT r.id, r.state, r.current_task_index, r.created_at,'
+            " COUNT(t.outcome) AS total, COUNT(CASE WHEN t.outcome = 'passed' THEN 1 END) AS passed"
+            ' FROM runs r LEFT JOIN agents a ON a.run_id = r.id'
+            ' LEFT JOIN task_results t ON t.agent_id = a.id'
+            ' GROUP BY r.id ORDER BY r.created_at DESC'
+        )
+        return [
+            RunListing(
+                run=Run(
+                    id=UUID(row['id']),
+                    state=RunState(row['state']),
+                    current_task_index=row['current_task_index'],
+                ),
+                created_at=row['created_at'],
+                passed=row['passed'],
+                total=row['total'],
+            )
+            for row in await cur.fetchall()
+        ]
+
+    async def get_build_source(self, run_id: UUID) -> BuildSource | None:
+        cur = await self._conn.execute('SELECT build_source FROM runs WHERE id = ?', (str(run_id),))
+        row = await cur.fetchone()
+        return BuildSource(row['build_source']) if row and row['build_source'] else None
+
     async def fail_unfinished_runs(self) -> int:
         """On boot: any run left mid-flight by a crashed driver is marked failed."""
         terminal = tuple(s.value for s in RunState if s.is_terminal)
@@ -142,19 +178,45 @@ class Database:
             for row in await cur.fetchall()
         ]
 
-    async def upsert_task_result(self, r: TaskResult) -> None:
+    async def upsert_task_result(self, r: TaskResult, reason: str | None = None) -> None:
         await self._conn.execute(
-            'INSERT OR REPLACE INTO task_results (agent_id, task_id, outcome, steps, final_state) VALUES (?, ?, ?, ?, ?)',
-            (str(r.agent_id), str(r.task_id), r.outcome.value, r.steps, json.dumps(r.final_state)),
-        )
+            'INSERT OR REPLACE INTO task_results (agent_id, task_id, outcome, steps, final_state, reason)'
+            ' VALUES (?, ?, ?, ?, ?, ?)',
+            (
+                str(r.agent_id), str(r.task_id), r.outcome.value, r.steps,
+                json.dumps(r.final_state), reason,
+            ),
+        )  # fmt: skip
         await self._conn.commit()
 
     async def list_task_results(self, run_id: UUID) -> list[TaskResult]:
         cur = await self._conn.execute(
-            'SELECT r.* FROM task_results r JOIN agents a ON a.id = r.agent_id WHERE a.run_id = ?',
+            'SELECT r.agent_id, r.task_id, r.outcome, r.steps, r.final_state FROM task_results r'
+            ' JOIN agents a ON a.id = r.agent_id WHERE a.run_id = ?',
             (str(run_id),),
         )
         return [
             TaskResult.model_validate({**dict(row), 'final_state': json.loads(row['final_state'])})
             for row in await cur.fetchall()
         ]
+
+    async def set_task_summary(self, agent_id: UUID, task_id: UUID, summary: str) -> None:
+        await self._conn.execute(
+            'UPDATE task_results SET summary = ? WHERE agent_id = ? AND task_id = ?',
+            (summary, str(agent_id), str(task_id)),
+        )
+        await self._conn.commit()
+
+    async def list_task_notes(
+        self, run_id: UUID
+    ) -> dict[tuple[UUID, UUID], tuple[str | None, str | None]]:
+        """(agent, task) -> (reason, summary): the scoring text the WS sends but TaskResult omits."""
+        cur = await self._conn.execute(
+            'SELECT r.agent_id, r.task_id, r.reason, r.summary FROM task_results r'
+            ' JOIN agents a ON a.id = r.agent_id WHERE a.run_id = ?',
+            (str(run_id),),
+        )
+        return {
+            (UUID(row['agent_id']), UUID(row['task_id'])): (row['reason'], row['summary'])
+            for row in await cur.fetchall()
+        }

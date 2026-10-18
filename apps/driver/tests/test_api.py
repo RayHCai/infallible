@@ -1,7 +1,9 @@
 import time
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
-from infallible_contracts import StartResponse
+from infallible_contracts import Interaction, StartResponse, TaskOutcome, TaskResult
 
 if TYPE_CHECKING:
     from conftest import FakeLauncher
@@ -79,3 +81,54 @@ def test_websocket_sends_snapshot(client: TestClient) -> None:
         msg = ws.receive_json()
     assert msg['type'] == 'run_state'
     assert msg['run']['id'] == run_id
+
+
+def test_replay_rebuilds_finished_run(client: TestClient) -> None:
+    run_id = client.post('/start').json()['run_id']
+    assert client.post(f'/runs/{run_id}/skip-scan').status_code == 202
+    _wait_for_state(client, run_id, 'connect')
+    client.post('/connect', json={'device_id': None})
+    client.post('/stop', json={'run_id': run_id})
+
+    runs = client.app.state.services.runs  # type: ignore[attr-defined]
+    agent = client.get(f'/runs/{run_id}/agents').json()[0]
+    task = client.get('/tasks').json()[0]
+    result = TaskResult(
+        agent_id=agent['id'],
+        task_id=task['id'],
+        outcome=TaskOutcome.FAILED,
+        steps=1,
+        final_state={},
+    )
+    action = '{"kind": "press", "button_id": "ok"}'
+    interaction = Interaction(
+        id=uuid4(), agent_id=agent['id'], task_id=task['id'], step=0, options=['a'],
+        chosen=action, timestamp=datetime.now(UTC), trace_path='t.json',
+    )  # fmt: skip
+
+    async def seed() -> None:
+        await runs.db.insert_interaction(interaction)
+        await runs.db.upsert_task_result(result)
+
+    async def summarize(**_: object) -> str:
+        return 'recap'
+
+    client.portal.call(seed)  # type: ignore[union-attr]
+    runs.summarizer.summarize = summarize
+
+    listing = client.get('/runs').json()
+    assert listing[0]['run']['id'] == run_id
+    assert (listing[0]['passed'], listing[0]['total']) == (0, 1)
+
+    messages = client.get(f'/runs/{run_id}/replay').json()
+    types = [m['type'] for m in messages]
+    assert types[:2] == ['run_state', 'build_done']
+    assert 'action' in [m['event']['type'] for m in messages if m['type'] == 'agent_event']
+    scored = next(m for m in messages if m['type'] == 'task_scored')
+    assert scored['reason']
+    assert next(m for m in messages if m['type'] == 'task_summary')['summary'] == 'recap'
+
+    runs.summarizer.summarize = None  # a saved summary must not be regenerated
+    again = client.get(f'/runs/{run_id}/replay').json()
+    assert 'task_summary' in [m['type'] for m in again]
+    assert client.get(f'/runs/{uuid4()}/replay').status_code == 404

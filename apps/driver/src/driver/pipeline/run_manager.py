@@ -12,21 +12,25 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import httpx
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from redis.exceptions import ResponseError
 
 from driver.pipeline.scoring import PredicateError, evaluate, explain
 from driver.services.launcher import AgentSpec
 from driver.services.qr import qr_png_b64
 from infallible_contracts import (
+    Action,
     ActionEvent,
     Agent,
     AgentError,
     AgentEvent,
     AgentEventMessage,
+    AgentReady,
     BuildDoneMessage,
     BuildProgressMessage,
+    BuildSource,
     ConnectResponse,
+    DriverMessage,
     Interaction,
     MeshAnnotations,
     QrPayload,
@@ -42,6 +46,7 @@ from infallible_contracts import (
     TaskOutcome,
     TaskResult,
     TaskScoredMessage,
+    TaskStarted,
     TaskSummaryMessage,
 )
 from infallible_contracts.loaders import load_personas, load_tasks
@@ -72,6 +77,20 @@ if TYPE_CHECKING:
     from infallible_contracts import Persona
 
 log = logging.getLogger(__name__)
+
+_ACTION: TypeAdapter[Action] = TypeAdapter(Action)
+
+
+def _reasoning_by_step(trace: dict[str, Any]) -> dict[int, str]:
+    # Older traces hold one entry per step; newer ones one per decision, with its steps in `actions`.
+    out: dict[int, str] = {}
+    for entry in trace.get('steps', []):
+        reasoning = entry.get('reasoning', '')
+        for step in [a['step'] for a in entry.get('actions', [])] or [entry.get('step')]:
+            if step is not None:
+                out[step] = reasoning
+    return out
+
 
 IDLE_POLL_S = 0.05
 
@@ -308,7 +327,8 @@ class RunManager:
             TaskResult(
                 agent_id=done.agent_id, task_id=done.task_id, outcome=outcome,
                 steps=done.steps, final_state=done.final_state,
-            )
+            ),
+            reason,
         )  # fmt: skip
         await self.broadcaster.publish(
             TaskScoredMessage(
@@ -338,6 +358,7 @@ class RunManager:
             log.exception('summarizer call failed for %s/%s', done.agent_id, done.task_id)
             return
         if summary:
+            await self.db.set_task_summary(done.agent_id, done.task_id, summary)
             await self.broadcaster.publish(
                 TaskSummaryMessage(
                     run_id=active.run.id,
@@ -415,6 +436,119 @@ class RunManager:
         )
         await asyncio.gather(*active.summaries)
         await self._teardown(active, RunState.COMPLETED)
+
+    async def replay(self, run_id: UUID) -> list[DriverMessage]:
+        """Rebuild a saved run's WS stream so the visualizer can show its end state.
+
+        Reasons and summaries that older runs never stored are filled in and saved.
+        """
+        run = await self.db.get_run(run_id)
+        if run is None:
+            raise RunNotFoundError(str(run_id))
+        tasks = load_tasks(self.layout.tasks_dir)
+        personas = load_personas(self.layout.personas_dir)
+        agents = await self.db.list_agents(run_id)
+        results = {(r.agent_id, r.task_id): r for r in await self.db.list_task_results(run_id)}
+        notes = await self.db.list_task_notes(run_id)
+
+        traces: dict[tuple[UUID, UUID], dict[str, Any]] = {}
+        for key in results:
+            path = self.layout.trace(run_id, *key)
+            if path.is_file():
+                traces[key] = json.loads(path.read_text('utf-8'))
+
+        actions: dict[tuple[UUID, UUID], list[ActionEvent]] = {}
+        for i in await self.db.list_interactions(run_id):
+            reasoning = _reasoning_by_step(traces.get((i.agent_id, i.task_id), {}))
+            actions.setdefault((i.agent_id, i.task_id), []).append(
+                ActionEvent(
+                    run_id=run_id, agent_id=i.agent_id, task_id=i.task_id, at=i.timestamp,
+                    step=i.step, options=i.options, chosen=_ACTION.validate_json(i.chosen),
+                    reasoning=reasoning.get(i.step, ''), trace_path=i.trace_path,
+                )
+            )  # fmt: skip
+
+        by_id = {t.id: t for t in tasks}
+        persona_of = {a.id: personas.get(a.persona_id) for a in agents}
+        reasons: dict[tuple[UUID, UUID], str | None] = {}
+        summaries: dict[tuple[UUID, UUID], str | None] = {}
+        for key, r in results.items():
+            reason, summaries[key] = notes.get(key, (None, None))
+            task = by_id.get(r.task_id)
+            if reason is None and r.outcome == TaskOutcome.FAILED and task:
+                try:
+                    reason = explain(task.success, r.final_state)
+                except PredicateError:
+                    pass
+                else:
+                    if not traces.get(key, {}).get('declared_done', True):
+                        reason = f'Ran out of steps after {r.steps}. {reason}'
+            reasons[key] = reason
+
+        async def fill_summary(key: tuple[UUID, UUID], task: Task) -> None:
+            try:
+                summary = await self.summarizer.summarize(
+                    persona=persona_of.get(key[0]),
+                    task=task,
+                    actions=actions.get(key, []),
+                    outcome=results[key].outcome,
+                    reason=reasons[key],
+                )
+            except Exception:
+                log.exception('summarizer call failed for %s/%s', *key)
+                return
+            if summary:
+                summaries[key] = summary
+                await self.db.set_task_summary(*key, summary)
+
+        await asyncio.gather(
+            *(
+                fill_summary(key, by_id[key[1]])
+                for key, summary in summaries.items()
+                if summary is None and key[1] in by_id
+            )
+        )
+
+        messages: list[DriverMessage] = [RunStateMessage(run=run)]
+        if self.layout.mesh(run_id).is_file():
+            source = await self.db.get_build_source(run_id) or BuildSource.FALLBACK
+            messages.append(
+                BuildDoneMessage(run_id=run_id, source=source, mesh_url=f'/runs/{run_id}/mesh')
+            )
+        for agent in agents:
+            messages.append(
+                AgentEventMessage(
+                    event=AgentReady(
+                        run_id=run_id, agent_id=agent.id, frame_endpoint=agent.frame_endpoint
+                    )
+                )
+            )
+            for task in tasks:
+                key = (agent.id, task.id)
+                steps = actions.get(key, [])
+                if key not in results and not steps:
+                    continue
+                started = TaskStarted(run_id=run_id, agent_id=agent.id, task_id=task.id)
+                messages.append(AgentEventMessage(event=started))
+                messages.extend(AgentEventMessage(event=a) for a in steps)
+                if (result := results.get(key)) is None:
+                    continue
+                messages.append(
+                    TaskScoredMessage(
+                        run_id=run_id, agent_id=agent.id, task_id=task.id,
+                        outcome=result.outcome, reason=reasons[key],
+                    )
+                )  # fmt: skip
+                if summary := summaries.get(key):
+                    messages.append(
+                        TaskSummaryMessage(
+                            run_id=run_id, agent_id=agent.id, task_id=task.id, summary=summary
+                        )
+                    )
+        if (path := self.layout.suggestions(run_id)).is_file():
+            count = len(SuggestionsFile.model_validate_json(path.read_bytes()).suggestions)
+            messages.append(SuggestionsReadyMessage(run_id=run_id, count=count))
+        return messages
 
     # ------------------------------------------------------------------ #
     # Helpers                                                            #

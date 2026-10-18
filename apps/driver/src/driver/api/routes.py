@@ -15,9 +15,11 @@ from infallible_contracts import (
     ConnectRequest,
     ConnectResponse,
     Device,
+    DriverMessage,
     MeshAnnotations,
     Persona,
     Run,
+    RunListing,
     StartResponse,
     StopRequest,
     SuggestionsFile,
@@ -113,6 +115,11 @@ async def devices(firmware: Firmware) -> list[Device]:
 # --------------------------------------------------------------------------- #
 # Read models                                                                 #
 # --------------------------------------------------------------------------- #
+@router.get('/runs')
+async def list_runs(db: Db) -> list[RunListing]:
+    return await db.list_runs()
+
+
 @router.get('/runs/{run_id}')
 async def get_run(run_id: UUID, db: Db) -> Run:
     run = await db.get_run(run_id)
@@ -148,6 +155,11 @@ async def get_suggestions(run_id: UUID, settings: Settings) -> SuggestionsFile:
     if not path.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'suggestions not ready')
     return SuggestionsFile.model_validate_json(path.read_bytes())
+
+
+@router.get('/runs/{run_id}/replay')
+async def replay(run_id: UUID, runs: Runs) -> list[DriverMessage]:
+    return await runs.replay(run_id)
 
 
 @router.get('/personas')

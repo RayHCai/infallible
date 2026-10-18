@@ -37,5 +37,7 @@ CREATE TABLE IF NOT EXISTS task_results (
     outcome     TEXT NOT NULL,
     steps       INTEGER NOT NULL,
     final_state TEXT NOT NULL,  -- JSON
+    reason      TEXT,
+    summary     TEXT,
     PRIMARY KEY (agent_id, task_id)
 );
