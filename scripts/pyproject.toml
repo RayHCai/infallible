@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MAUDE download, exploration and seed-data scripts."
 requires-python = ">=3.14,<3.15"
 dependencies = [
-  "anthropic>=1.0",
+  "anthropic>=1.17.0",
   "httpx>=0.28",
   "infallible-contracts",
   "ipykernel>=6.29",
