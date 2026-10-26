@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@napi-rs/canvas": "^1.0.11",
+    "@napi-rs/canvas": "^1.0.13",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -38,6 +38,6 @@
     "prettier": "^3.9.10",
     "three": "0.186.1",
     "typescript": "catalog:",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.72.0"
   }
 }
