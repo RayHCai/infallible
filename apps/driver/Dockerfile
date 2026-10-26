@@ -43,8 +43,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # ---------------------------------------------------------------------------
 FROM python:${PYTHON_VERSION}-alpine AS runtime
+# /state is world-writable: compose may run the driver as the host uid, which
+# would otherwise be locked out of the named volume seeded from this directory.
 RUN addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app \
- && mkdir -p /data /state && chown app:app /data /state
+ && mkdir -p /data /state && chown app:app /data /state && chmod 1777 /state
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
