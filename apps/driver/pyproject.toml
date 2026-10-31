@@ -7,7 +7,7 @@ dependencies = [
   "infallible-contracts",
   "aiosqlite>=0.21",
   "anthropic>=1.0",
-  "fastapi>=0.115",
+  "fastapi>=0.162.0",
   "httpx>=0.28",
   "pillow>=11.0",
   "pydantic-settings>=2.7",
