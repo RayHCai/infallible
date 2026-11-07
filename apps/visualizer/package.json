@@ -16,16 +16,16 @@
     "@infallible/contracts": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "three": "^0.186.1"
+    "three": "^0.187.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.12.1",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/react": "catalog:",
     "@types/react-dom": "~19.2.2",
-    "@types/three": "^0.186.0",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@types/three": "^0.187.0",
+    "@vitejs/plugin-react": "^6.2.1",
     "typescript": "catalog:",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.4"
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
   }
 }
